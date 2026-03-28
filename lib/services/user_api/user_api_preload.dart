@@ -284,9 +284,11 @@ function handleNativeResponse(data) {
   delete __lx_requestQueue__[data.requestKey];
   targetRequest.requestInfo.aborted = true;
   if (data.error == null) {
-    // 原项目 response.body 已经被 JSON.parse 过（如果可解析的话）
     var resp = data.response;
-    try { resp.body = JSON.parse(resp.body); } catch(e) {}
+    // body 可能已是对象（Dart 侧预解析），也可能是字符串
+    if (typeof resp.body === 'string') {
+      try { resp.body = JSON.parse(resp.body); } catch(e) {}
+    }
     targetRequest.callback(null, resp);
   } else {
     targetRequest.callback(new Error(data.error), null);

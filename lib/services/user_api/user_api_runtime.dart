@@ -153,6 +153,7 @@ class UserApiRuntime {
         final reqUrl = data['url'] as String? ?? 'unknown';
         _log('🌐 脚本请求: $reqUrl');
         _handleHttp(data);
+        break;
       case 'response':
         final key = data['requestKey'] as String?;
         _log('Response: key=$key status=${data['status']}');
@@ -194,26 +195,23 @@ class UserApiRuntime {
           : HttpClient.get(url, headers: headers);
       final resp = await httpFuture.timeout(timeoutDuration);
       _log('HTTP 响应: ${resp.statusCode} (${resp.body.length} 字节)');
-      // 对齐洛雪原版：body 保持原始字符串（原项目 response.body = text，然后 try JSON.parse）
+      // 解析 body（如果可解析为 JSON），对齐脚本期望的格式
+      dynamic parsedBody;
+      try { parsedBody = jsonDecode(resp.body); } catch (_) { parsedBody = resp.body; }
       final respData = {
         'statusCode': resp.statusCode,
         'statusMessage': resp.statusText ?? '',
         'headers': resp.headers,
-        'body': resp.body, // 原始字符串，JS 侧会尝试 JSON.parse
+        'body': parsedBody,
         'url': url,
         'ok': resp.statusCode >= 200 && resp.statusCode < 300,
       };
-      if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        // 对齐原项目：error 放在顶层，response 为原始 resp
-        final jsSafe = jsonEncode({'error': 'HTTP ${resp.statusCode}', 'requestKey': key, 'response': respData})
-            .replaceAll('\\', '\\\\').replaceAll("'", "\\'");
-        _eval("handleNativeResponse(JSON.parse('$jsSafe'));");
-        _log('⚠️ HTTP 错误 ${resp.statusCode}', isError: true);
-      } else {
-        final jsSafe = jsonEncode({'error': null, 'requestKey': key, 'response': respData})
-            .replaceAll('\\', '\\\\').replaceAll("'", "\\'");
-        _eval("handleNativeResponse(JSON.parse('$jsSafe'));");
-      }
+      final jsSafe = jsonEncode({
+        'error': resp.statusCode >= 200 && resp.statusCode < 300 ? null : 'HTTP ${resp.statusCode}',
+        'requestKey': key,
+        'response': respData,
+      }).replaceAll('\\', '\\\\').replaceAll("'", "\\'");
+      _eval("handleNativeResponse(JSON.parse('$jsSafe'));");
     } catch (e) {
       _log('HTTP 错误 (key=$key): $e', isError: true);
       try {
