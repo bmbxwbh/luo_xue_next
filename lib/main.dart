@@ -463,7 +463,7 @@ class _MyScreenState extends State<MyScreen> {
                   color: Colors.green.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.folder_music_rounded, color: Colors.green, size: 26),
+                child: const Icon(Icons.folder_rounded, color: Colors.green, size: 26),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -561,11 +561,7 @@ class _MyScreenState extends State<MyScreen> {
                     title: Text(localService.songs[i].name, maxLines: 1, overflow: TextOverflow.ellipsis),
                     subtitle: Text(localService.songs[i].singer, maxLines: 1, overflow: TextOverflow.ellipsis),
                     onTap: () {
-                      context.read<PlayerService>().play(
-                        localService.songs[i],
-                        listId: 'local',
-                        list: localService.songs,
-                      );
+                      globalPlayer.playMusic(localService.songs[i]);
                       Navigator.pop(context);
                     },
                   ),

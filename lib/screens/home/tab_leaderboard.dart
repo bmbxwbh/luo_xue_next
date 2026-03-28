@@ -121,7 +121,7 @@ class _TabLeaderboardState extends State<TabLeaderboard> {
 
       switch (_source) {
         case MusicSource.wy:
-          result = await WySdk.getList(board.bangid);
+          result = await WySdk.getLeaderboardList(board.bangid, 1);
           break;
         case MusicSource.kw:
           result = await KwSdk.getLeaderboardList(board.bangid, 1);
@@ -130,7 +130,7 @@ class _TabLeaderboardState extends State<TabLeaderboard> {
           result = await KgSdk.getLeaderboardList(board.bangid, 1);
           break;
         case MusicSource.tx:
-          result = await TxSdk.getLeaderboardList(board.bangid, '');
+          result = await TxSdk.getLeaderboardList(board.bangid, 1);
           break;
         case MusicSource.mg:
           result = await MgSdk.getLeaderboardList(board.bangid, 1);

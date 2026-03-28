@@ -97,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen>
                       selected: selected,
                       onSelected: (_) {
                         setState(() => _source = src);
-                        context.read<SettingStore>().setSetting('default_source', src.id);
+                        context.read<SettingStore>().setDefaultSource(src);
                         Navigator.pop(context);
                       },
                     );
