@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/enums.dart';
-import '../../models/leaderboard_info.dart';
 import '../../models/song_model.dart';
+import '../../models/leaderboard_info.dart';
 import '../../services/settings/setting_store.dart';
 import '../../services/player/player_service.dart';
+import '../../music_sdk/index.dart';
+import '../../music_sdk/wy/index.dart';
+import '../../music_sdk/kw/index.dart';
+import '../../music_sdk/kg/index.dart';
+import '../../music_sdk/tx/index.dart';
+import '../../music_sdk/mg/index.dart';
 import '../../widgets/source_selector.dart';
 import '../../widgets/song_list_tile.dart';
 
-/// 排行榜 Tab
+/// 排行榜 Tab — 真实数据版
 class TabLeaderboard extends StatefulWidget {
   const TabLeaderboard({super.key});
 
@@ -17,138 +23,236 @@ class TabLeaderboard extends StatefulWidget {
 }
 
 class _TabLeaderboardState extends State<TabLeaderboard> {
-  MusicSource _source = MusicSource.kw;
+  MusicSource _source = MusicSource.wy;
   int _selectedIndex = 0;
-
-  // 模拟排行榜数据
-  final Map<MusicSource, List<LeaderboardInfo>> _leaderboards = {
-    MusicSource.kw: [
-      const LeaderboardInfo(id: 'kw_1', name: '飙升榜', bangid: '93', source: 'kw'),
-      const LeaderboardInfo(id: 'kw_2', name: '新歌榜', bangid: '17', source: 'kw'),
-      const LeaderboardInfo(id: 'kw_3', name: '热歌榜', bangid: '18', source: 'kw'),
-      const LeaderboardInfo(id: 'kw_4', name: '说唱榜', bangid: '24', source: 'kw'),
-      const LeaderboardInfo(id: 'kw_5', name: '古典榜', bangid: '26', source: 'kw'),
-      const LeaderboardInfo(id: 'kw_6', name: '电音榜', bangid: '25', source: 'kw'),
-      const LeaderboardInfo(id: 'kw_7', name: 'ACG榜', bangid: '27', source: 'kw'),
-      const LeaderboardInfo(id: 'kw_8', name: '原创榜', bangid: '22', source: 'kw'),
-    ],
-    MusicSource.kg: [
-      const LeaderboardInfo(id: 'kg_1', name: '飙升榜', bangid: '6666', source: 'kg'),
-      const LeaderboardInfo(id: 'kg_2', name: '新歌榜', bangid: '8888', source: 'kg'),
-      const LeaderboardInfo(id: 'kg_3', name: '热歌榜', bangid: '1111', source: 'kg'),
-    ],
-    MusicSource.tx: [
-      const LeaderboardInfo(id: 'tx_1', name: '飙升榜', bangid: '62', source: 'tx'),
-      const LeaderboardInfo(id: 'tx_2', name: '新歌榜', bangid: '27', source: 'tx'),
-      const LeaderboardInfo(id: 'tx_3', name: '热歌榜', bangid: '26', source: 'tx'),
-    ],
-    MusicSource.wy: [
-      const LeaderboardInfo(id: 'wy_1', name: '飙升榜', bangid: '19723756', source: 'wy'),
-      const LeaderboardInfo(id: 'wy_2', name: '新歌榜', bangid: '3779629', source: 'wy'),
-      const LeaderboardInfo(id: 'wy_3', name: '热歌榜', bangid: '3778678', source: 'wy'),
-    ],
-    MusicSource.mg: [
-      const LeaderboardInfo(id: 'mg_1', name: '飙升榜', bangid: '1', source: 'mg'),
-      const LeaderboardInfo(id: 'mg_2', name: '新歌榜', bangid: '2', source: 'mg'),
-      const LeaderboardInfo(id: 'mg_3', name: '热歌榜', bangid: '3', source: 'mg'),
-    ],
-  };
-
-  // 模拟歌曲数据
+  List<LeaderboardInfo> _boards = [];
   List<SongModel> _songs = [];
+  bool _loadingBoards = true;
+  bool _loadingSongs = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     final setting = context.read<SettingStore>();
     _source = setting.defaultSource;
-    _loadSongs();
+    _loadBoards();
   }
 
-  void _loadSongs() {
-    // 模拟排行榜歌曲
-    _songs = List.generate(
-      30,
-      (i) => SongModel(
-        id: '${_source.id}_lb_$i',
-        name: '排行榜歌曲 ${i + 1}',
-        singer: '歌手 ${i + 1}',
-        source: _source,
-        interval: '${2 + (i % 3)}:${(i * 7 % 60).toString().padLeft(2, '0')}',
-        intervalSec: 120 + i * 7,
-        meta: MusicInfoMeta(
-          songId: 'lb_$i',
-          albumName: '专辑 ${i + 1}',
-          picUrl: '',
-          qualitys: const [MusicType(type: '320k')],
-          qualitysMap: const {'320k': MusicType(type: '320k')},
-        ),
-      ),
-    );
+  void _loadBoards() {
+    setState(() {
+      _loadingBoards = true;
+      _error = null;
+    });
+
+    try {
+      late List<LeaderboardInfo> boards;
+      switch (_source) {
+        case MusicSource.kw:
+          boards = KwLeaderboard.boardList;
+          break;
+        case MusicSource.kg:
+          boards = KgLeaderboard.boardList;
+          break;
+        case MusicSource.wy:
+          boards = WyLeaderboard.boardList
+              .map((e) => LeaderboardInfo(
+                    id: e['id'],
+                    name: e['name'],
+                    bangid: e['bangid'],
+                    source: 'wy',
+                  ))
+              .toList();
+          break;
+        case MusicSource.tx:
+          boards = TxLeaderboard.boardList
+              .map((e) => LeaderboardInfo(
+                    id: e['id'],
+                    name: e['name'],
+                    bangid: '${e['bangid']}',
+                    source: 'tx',
+                  ))
+              .toList();
+          break;
+        case MusicSource.mg:
+          boards = MgLeaderboard.boardList
+              .map((e) => LeaderboardInfo(
+                    id: e['id'],
+                    name: e['name'],
+                    bangid: e['bangid'],
+                    source: 'mg',
+                  ))
+              .toList();
+          break;
+        default:
+          boards = [];
+      }
+      setState(() {
+        _boards = boards;
+        _loadingBoards = false;
+        _selectedIndex = 0;
+        _songs = [];
+      });
+      if (boards.isNotEmpty) _loadSongs();
+    } catch (e) {
+      setState(() {
+        _loadingBoards = false;
+        _error = '加载榜单失败: $e';
+      });
+    }
+  }
+
+  Future<void> _loadSongs() async {
+    if (_boards.isEmpty) return;
+    setState(() {
+      _loadingSongs = true;
+      _error = null;
+    });
+
+    try {
+      final board = _boards[_selectedIndex];
+      late Map<String, dynamic> result;
+
+      switch (_source) {
+        case MusicSource.wy:
+          result = await WySdk.getList(board.bangid);
+          break;
+        case MusicSource.kw:
+          result = await KwSdk.getLeaderboardList(board.bangid, 1);
+          break;
+        case MusicSource.kg:
+          result = await KgSdk.getLeaderboardList(board.bangid, 1);
+          break;
+        case MusicSource.tx:
+          result = await TxSdk.getLeaderboardList(board.bangid, '');
+          break;
+        case MusicSource.mg:
+          result = await MgSdk.getLeaderboardList(board.bangid, 1);
+          break;
+        default:
+          result = {'list': []};
+      }
+
+      final list = (result['list'] as List?) ?? [];
+      setState(() {
+        _songs = list
+            .map((item) => SongModel.fromLxMusicInfo(item as Map<String, dynamic>))
+            .toList();
+        _loadingSongs = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loadingSongs = false;
+        _error = '加载歌曲失败: $e';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final boards = _leaderboards[_source] ?? [];
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (_source == MusicSource.local) {
+      return const Center(child: Text('本地音乐不支持排行榜'));
+    }
 
     return Column(
       children: [
         SourceSelector(
           currentSource: _source,
           onChanged: (src) {
-            setState(() {
-              _source = src;
-              _selectedIndex = 0;
-              _loadSongs();
-            });
+            if (src == MusicSource.local) return;
+            setState(() => _source = src);
+            _loadBoards();
           },
         ),
         Expanded(
-          child: Row(
-            children: [
-              // 左侧榜单列表
-              SizedBox(
-                width: 120,
-                child: _buildBoardList(boards),
-              ),
-              const VerticalDivider(width: 1),
-              // 右侧歌曲列表
-              Expanded(child: _buildSongList()),
-            ],
-          ),
+          child: _loadingBoards
+              ? const Center(child: CircularProgressIndicator())
+              : Row(
+                  children: [
+                    // 左侧榜单列表
+                    SizedBox(
+                      width: 110,
+                      child: _buildBoardList(),
+                    ),
+                    VerticalDivider(width: 1, color: colorScheme.outlineVariant),
+                    // 右侧歌曲列表
+                    Expanded(child: _buildSongList()),
+                  ],
+                ),
         ),
       ],
     );
   }
 
-  Widget _buildBoardList(List<LeaderboardInfo> boards) {
+  Widget _buildBoardList() {
     return ListView.builder(
-      itemCount: boards.length,
+      itemCount: _boards.length,
+      padding: const EdgeInsets.symmetric(vertical: 4),
       itemBuilder: (context, index) {
-        final board = boards[index];
+        final board = _boards[index];
         final selected = index == _selectedIndex;
-        return ListTile(
-          title: Text(
-            board.name,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-              color: selected ? Theme.of(context).colorScheme.primary : null,
+        return InkWell(
+          onTap: () {
+            setState(() => _selectedIndex = index);
+            _loadSongs();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: selected
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : null,
+              border: selected
+                  ? Border(
+                      left: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 3,
+                      ),
+                    )
+                  : null,
+            ),
+            child: Text(
+              board.name,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                color: selected
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : null,
+              ),
             ),
           ),
-          selected: selected,
-          onTap: () {
-            setState(() {
-              _selectedIndex = index;
-              _loadSongs();
-            });
-          },
         );
       },
     );
   }
 
   Widget _buildSongList() {
+    if (_loadingSongs) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 40, color: Colors.grey),
+            const SizedBox(height: 12),
+            Text(_error!, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _loadSongs,
+              icon: const Icon(Icons.refresh),
+              label: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_songs.isEmpty) {
       return const Center(child: Text('暂无数据'));
     }
@@ -156,9 +260,8 @@ class _TabLeaderboardState extends State<TabLeaderboard> {
     return ListView.builder(
       itemCount: _songs.length,
       itemBuilder: (context, index) {
-        final song = _songs[index];
         return SongListTile(
-          song: song,
+          song: _songs[index],
           index: index,
           listId: 'leaderboard',
         );
