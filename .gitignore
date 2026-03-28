@@ -53,3 +53,6 @@ android/app/build/
 android/build/
 android/.gradle/
 pubspec.lock
+*.hprof
+local.properties
+*.iml
