@@ -359,12 +359,10 @@ class SongModel {
     map['source'] = source.id;
     map['interval'] = interval;
     map['img'] = img;
-    // 对齐洛雪原版：保留 lrc 相关字段（用户脚本可能需要）
-    if (source.id == 'mg' && meta.lrcUrl != null) map['lrcUrl'] = meta.lrcUrl;
-    if (source.id == 'mg' && meta.mrcUrl != null) map['mrcUrl'] = meta.mrcUrl;
-    if (source.id == 'mg' && meta.trcUrl != null) map['trcUrl'] = meta.trcUrl;
-    // lrc 字段保留为 null（对齐原项目）
-    map['lrc'] = null;
+    // 对齐洛雪原版：只在原项目有这些字段时才传递
+    if (meta.lrcUrl != null) map['lrcUrl'] = meta.lrcUrl;
+    if (meta.mrcUrl != null) map['mrcUrl'] = meta.mrcUrl;
+    if (meta.trcUrl != null) map['trcUrl'] = meta.trcUrl;
     map['types'] = types;
     map['_types'] = typesMap;
     map['typeUrl'] = <String, dynamic>{};
