@@ -194,27 +194,32 @@ class UserApiRuntime {
           : HttpClient.get(url, headers: headers);
       final resp = await httpFuture.timeout(timeoutDuration);
       _log('HTTP 响应: ${resp.statusCode} (${resp.body.length} 字节)');
-      dynamic parsedBody;
-      try {
-        parsedBody = jsonDecode(resp.body);
-      } catch (_) {
-        parsedBody = resp.body;
-      }
-      final respData = {'statusCode': resp.statusCode, 'statusMessage': resp.statusText ?? '', 'headers': resp.headers, 'body': parsedBody};
-      final Map<String, dynamic> payload;
+      // 对齐洛雪原版：body 保持原始字符串（原项目 response.body = text，然后 try JSON.parse）
+      final respData = {
+        'statusCode': resp.statusCode,
+        'statusMessage': resp.statusText ?? '',
+        'headers': resp.headers,
+        'body': resp.body, // 原始字符串，JS 侧会尝试 JSON.parse
+        'url': url,
+        'ok': resp.statusCode >= 200 && resp.statusCode < 300,
+      };
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        payload = {'error': 'HTTP ${resp.statusCode}', 'response': respData};
+        // 对齐原项目：error 放在顶层，response 为原始 resp
+        final jsSafe = jsonEncode({'error': 'HTTP ${resp.statusCode}', 'requestKey': key, 'response': respData})
+            .replaceAll('\\', '\\\\').replaceAll("'", "\\'");
+        _eval("handleNativeResponse(JSON.parse('$jsSafe'));");
         _log('⚠️ HTTP 错误 ${resp.statusCode}', isError: true);
       } else {
-        payload = {'error': null, 'response': respData};
+        final jsSafe = jsonEncode({'error': null, 'requestKey': key, 'response': respData})
+            .replaceAll('\\', '\\\\').replaceAll("'", "\\'");
+        _eval("handleNativeResponse(JSON.parse('$jsSafe'));");
       }
-      final encoded = base64Encode(utf8.encode(jsonEncode(payload)));
-      _eval("globalThis.__lx_setHttpResponse__('$key','$encoded');");
     } catch (e) {
       _log('HTTP 错误 (key=$key): $e', isError: true);
       try {
-        final encoded = base64Encode(utf8.encode(jsonEncode({'error': e.toString(), 'response': null})));
-        _eval("globalThis.__lx_setHttpResponse__('$key','$encoded');");
+        final jsSafe = jsonEncode({'error': e.toString(), 'requestKey': key, 'response': null})
+            .replaceAll('\\', '\\\\').replaceAll("'", "\\'");
+        _eval("handleNativeResponse(JSON.parse('$jsSafe'));");
       } catch (e2) {
         _log('❌ 传递 HTTP 错误给 JS 失败: $e2', isError: true);
       }

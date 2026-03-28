@@ -163,7 +163,7 @@ var __lx_aesEncrypt__ = (function() {
 // === 在 lx_setup 之前暴露 lx 对象供用户脚本使用 ===
 var __lx_handlers__ = {};
 var __lx_inited__ = false;
-var __lx_httpCallbacks__ = {};
+var __lx_requestQueue__ = {};
 var __lx_reqCounter__ = 0;
 
 // 捕获 console.log 输出到事件队列（方便 Dart 侧查看）
@@ -204,9 +204,35 @@ globalThis.lx = {
   },
   request: function(url, options, callback) {
     if (typeof options==='function'){callback=options;options={};} if(!options)options={};
-    var id='http_'+(++__lx_reqCounter__); __lx_httpCallbacks__[id]=callback;
-    __pushEvent__('request',{requestKey:id,url:url,options:{method:(options.method||'GET').toUpperCase(),headers:options.headers||{},body:options.body||options.form||options.formData||null,timeout:options.timeout||30000}});
-    return {aborted:false,abort:function(){this.aborted=true;}};
+    var id='http_'+(++__lx_reqCounter__);
+    var requestInfo = { aborted: false, abort: function(){ this.aborted=true; } };
+    __lx_requestQueue__[id] = { callback: callback, requestInfo: requestInfo };
+    // 统一 options 格式（对齐原项目 request.js 的 handleRequestData）
+    var method = (options.method || 'GET').toUpperCase();
+    var headers = Object.assign({ 'Accept': 'application/json' }, options.headers || {});
+    var body = options.body || null;
+    if (options.form && !body) {
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      var formBody = [];
+      var formKeys = Object.keys(options.form);
+      for (var fi = 0; fi < formKeys.length; fi++) {
+        formBody.push(encodeURIComponent(formKeys[fi]) + '=' + encodeURIComponent(options.form[formKeys[fi]]));
+      }
+      body = formBody.join('&');
+    }
+    if (options.formData && !body) {
+      body = options.formData;
+    }
+    if (method === 'POST' && !headers['Content-Type'] && !options.formData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (headers['Content-Type'] === 'application/json' && body && typeof body !== 'string') {
+      body = JSON.stringify(body);
+    }
+    __pushEvent__('request', { requestKey: id, url: url, options: {
+      method: method, headers: headers, body: body, timeout: options.timeout || 13000
+    }});
+    return requestInfo;
   },
   utils: {
     crypto: {
@@ -248,31 +274,21 @@ function __pushEvent__(action, data) {
   if (globalThis.__lx_event_queue__) globalThis.__lx_event_queue__.push({action:action, data:JSON.stringify(data)});
 }
 
-// 响应处理：Dart 通过 base64 编码传递响应，避免转义问题
-globalThis.__lx_httpResponses__ = {};
-globalThis.__lx_setHttpResponse__ = function(requestKey, base64Data) {
-  var cb = __lx_httpCallbacks__[requestKey];
-  if (!cb) return;
-  delete __lx_httpCallbacks__[requestKey];
-  try {
-    var decodedStr = atob(base64Data);
-    var decoded = JSON.parse(decodedStr);
-    if (decoded.error) {
-      cb(new Error(decoded.error), null, null);
-    } else {
-      var resp = decoded.response;
-      // 对齐洛雪原版回调签名：callback(err, {statusCode, statusMessage, headers, body}, body)
-      cb(null, {
-        statusCode: resp.statusCode,
-        statusMessage: resp.statusMessage || '',
-        headers: resp.headers,
-        body: resp.body,
-      }, resp.body);
-    }
-  } catch(e) {
-    cb(e, null, null);
+// 响应处理：对齐洛雪原版 handleNativeResponse
+function handleNativeResponse(data) {
+  var targetRequest = __lx_requestQueue__[data.requestKey];
+  if (!targetRequest) return;
+  delete __lx_requestQueue__[data.requestKey];
+  targetRequest.requestInfo.aborted = true;
+  if (data.error == null) {
+    // 原项目 response.body 已经被 JSON.parse 过（如果可解析的话）
+    var resp = data.response;
+    try { resp.body = JSON.parse(resp.body); } catch(e) {}
+    targetRequest.callback(null, resp);
+  } else {
+    targetRequest.callback(new Error(data.error), null);
   }
-};
+}
 
 // 响应验证函数（对齐洛雪原版 handleRequest）
 function __verifyLyric__(info) {
