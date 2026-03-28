@@ -179,7 +179,11 @@ class UserApiRuntime {
     final url = data['url'] as String;
     final opts = data['options'] as Map<String, dynamic>? ?? {};
     final method = (opts['method'] as String? ?? 'GET').toUpperCase();
-    final headers = (opts['headers'] as Map?)?.cast<String, String>() ?? {};
+    final headers = <String, String>{
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
+      'Accept': 'application/json',
+      ...(opts['headers'] as Map?)?.cast<String, String>() ?? {},
+    };
     final body = opts['body'];
     final jsTimeout = (opts['timeout'] as int?) ?? 30000;
     final timeoutDuration = Duration(milliseconds: jsTimeout > 15000 ? jsTimeout : 15000);
@@ -196,7 +200,7 @@ class UserApiRuntime {
       } catch (_) {
         parsedBody = resp.body;
       }
-      final respData = {'statusCode': resp.statusCode, 'headers': resp.headers, 'body': parsedBody};
+      final respData = {'statusCode': resp.statusCode, 'statusMessage': resp.statusText ?? '', 'headers': resp.headers, 'body': parsedBody};
       final Map<String, dynamic> payload;
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
         payload = {'error': 'HTTP ${resp.statusCode}', 'response': respData};
@@ -224,35 +228,39 @@ class UserApiRuntime {
     _pendingRequests[key] = completer;
     _log('调用 handler: source=$source action=$action key=$key');
 
-    // 直接传 JS 对象字面量，不用 JSON.parse
-    final infoLiteral = _toJs(info);
-    _log('infoLiteral 前300字符: ${infoLiteral.length > 300 ? infoLiteral.substring(0, 300) : infoLiteral}');
-    _eval('globalThis.__lx_call_info__=$infoLiteral;');
+    // 使用 JSON.stringify 传数据（与洛雪原版一致），避免特殊字符问题
+    final infoJson = jsonEncode(info).replaceAll('\\', '\\\\').replaceAll("'", "\\'");
+    _eval("globalThis.__lx_call_info__=JSON.parse('$infoJson');");
     final jsCode = '''
         (function(){try{
           var handler=__lx_handlers__['request'];
           if(!handler){__pushEvent__('response',{requestKey:'$key',status:false,errorMessage:'Request event is not defined'});return;}
           handler.call(globalThis.lx, {source:'$source',action:'$action',info:globalThis.__lx_call_info__}).then(function(response){
-            console.log('handler response: '+JSON.stringify(response));
             var result;
             switch('$action'){
               case 'musicUrl':
-                var url=__verifyUrl__(response);
-                result={source:'$source',action:'$action',data:{type:globalThis.__lx_call_info__.type,url:url}};
+                if(typeof response!=='string'||response.length>2048||!/^https?:/.test(response))throw new Error('failed');
+                result={source:'$source',action:'$action',data:{type:globalThis.__lx_call_info__.type,url:response}};
                 break;
               case 'lyric':
-                result={source:'$source',action:'$action',data:__verifyLyric__(response)};
+                if(typeof response!=='object'||typeof response.lyric!=='string')throw new Error('failed');
+                if(response.lyric.length>51200)throw new Error('failed');
+                result={source:'$source',action:'$action',data:{
+                  lyric:response.lyric,
+                  tlyric:(typeof response.tlyric==='string'&&response.tlyric.length<5120)?response.tlyric:null,
+                  rlyric:(typeof response.rlyric==='string'&&response.rlyric.length<5120)?response.rlyric:null,
+                  lxlyric:(typeof response.lxlyric==='string'&&response.lxlyric.length<8192)?response.lxlyric:null
+                }};
                 break;
               case 'pic':
-                var picUrl=__verifyUrl__(response);
-                result={source:'$source',action:'$action',data:picUrl};
+                if(typeof response!=='string'||response.length>2048||!/^https?:/.test(response))throw new Error('failed');
+                result={source:'$source',action:'$action',data:response};
                 break;
               default:
                 result={source:'$source',action:'$action',data:response};
             }
             __pushEvent__('response',{requestKey:'$key',status:true,result:result});
           }).catch(function(err){
-            console.log('handler error: '+err.message);
             __pushEvent__('response',{requestKey:'$key',status:false,errorMessage:err.message||String(err)});
           });
         }catch(err){__pushEvent__('response',{requestKey:'$key',status:false,errorMessage:err.message||String(err)});}})()
@@ -288,13 +296,13 @@ class UserApiRuntime {
   }
 
   Future<Map<String, dynamic>> getLyric({required String source, required Map<String, dynamic> musicInfo}) async {
-    final r = await _callHandler(source, 'lyric', {'musicInfo': musicInfo});
+    final r = await _callHandler(source, 'lyric', {'type': 'music', 'musicInfo': musicInfo});
     if (r['status'] == true) return r['result']['data'] as Map<String, dynamic>;
     return {};
   }
 
   Future<String> getPic({required String source, required Map<String, dynamic> musicInfo}) async {
-    final r = await _callHandler(source, 'pic', {'musicInfo': musicInfo});
+    final r = await _callHandler(source, 'pic', {'type': 'music', 'musicInfo': musicInfo});
     if (r['status'] == true) return r['result']['data'] as String;
     return '';
   }

@@ -7,12 +7,14 @@ class HttpResponse {
   final String body;
   final Map<String, String> headers;
   final dynamic jsonBody;
+  final String? statusText;
 
   const HttpResponse({
     required this.statusCode,
     required this.body,
     required this.headers,
     this.jsonBody,
+    this.statusText,
   });
 
   bool get ok => statusCode >= 200 && statusCode < 300;
@@ -69,6 +71,6 @@ class HttpClient {
     }
     dynamic jsonBody;
     try { jsonBody = jsonDecode(body); } catch (_) {}
-    return HttpResponse(statusCode: resp.statusCode, body: body, headers: resp.headers, jsonBody: jsonBody);
+    return HttpResponse(statusCode: resp.statusCode, body: body, headers: resp.headers, jsonBody: jsonBody, statusText: resp.reasonPhrase);
   }
 }

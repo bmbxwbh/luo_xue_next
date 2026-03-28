@@ -251,37 +251,26 @@ function __pushEvent__(action, data) {
 // 响应处理：Dart 通过 base64 编码传递响应，避免转义问题
 globalThis.__lx_httpResponses__ = {};
 globalThis.__lx_setHttpResponse__ = function(requestKey, base64Data) {
-  var cb = null;
+  var cb = __lx_httpCallbacks__[requestKey];
+  if (!cb) return;
+  delete __lx_httpCallbacks__[requestKey];
   try {
-    var decodedStr;
-    try {
-      decodedStr = atob(base64Data);
-    } catch(b64Err) {
-      console.log('base64 decode error: ' + b64Err.message);
-      cb = __lx_httpCallbacks__[requestKey];
-      if (cb) { delete __lx_httpCallbacks__[requestKey]; cb(new Error('Base64 decode error: ' + b64Err.message), null, null); }
-      return;
+    var decodedStr = atob(base64Data);
+    var decoded = JSON.parse(decodedStr);
+    if (decoded.error) {
+      cb(new Error(decoded.error), null, null);
+    } else {
+      var resp = decoded.response;
+      // 对齐洛雪原版回调签名：callback(err, {statusCode, statusMessage, headers, body}, body)
+      cb(null, {
+        statusCode: resp.statusCode,
+        statusMessage: resp.statusMessage || '',
+        headers: resp.headers,
+        body: resp.body,
+      }, resp.body);
     }
-    var decoded;
-    try {
-      decoded = JSON.parse(decodedStr);
-    } catch(jsonErr) {
-      console.log('JSON parse error: ' + jsonErr.message + ' | data: ' + decodedStr.substring(0, 200));
-      cb = __lx_httpCallbacks__[requestKey];
-      if (cb) { delete __lx_httpCallbacks__[requestKey]; cb(new Error('JSON parse error: ' + jsonErr.message), null, null); }
-      return;
-    }
-    cb = __lx_httpCallbacks__[requestKey];
-    if (!cb) { console.log('no callback for: ' + requestKey); return; }
-    delete __lx_httpCallbacks__[requestKey];
-    if (decoded.error) cb(new Error(decoded.error), null, null);
-    else cb(null, decoded.response, decoded.response ? decoded.response.body : null);
   } catch(e) {
-    console.log('HTTP response handler error: ' + e.message);
-    try {
-      cb = cb || __lx_httpCallbacks__[requestKey];
-      if (cb) { delete __lx_httpCallbacks__[requestKey]; cb(e, null, null); }
-    } catch(e2) { console.log('callback error: ' + e2.message); }
+    cb(e, null, null);
   }
 };
 
