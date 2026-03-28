@@ -4,7 +4,6 @@ import '../../models/enums.dart';
 import '../../services/settings/setting_store.dart';
 import 'tab_songlist.dart';
 import 'tab_leaderboard.dart';
-import 'tab_mylist.dart';
 
 /// 首页 — 推荐歌单 / 排行榜 / 我的歌单
 class HomeScreen extends StatefulWidget {
@@ -22,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen>
   final List<_TabInfo> _tabs = const [
     _TabInfo('推荐', Icons.explore_rounded),
     _TabInfo('排行', Icons.bar_chart_rounded),
-    _TabInfo('歌单', Icons.library_music_rounded),
   ];
 
   bool _headerVisible = true;
@@ -45,9 +43,9 @@ class _HomeScreenState extends State<HomeScreen>
   bool _onScroll(ScrollNotification n) {
     if (n is ScrollUpdateNotification) {
       final delta = n.metrics.pixels - _lastScrollOffset;
-      if (delta > 8 && _headerVisible) {
+      if (delta > 5 && _headerVisible) {
         setState(() => _headerVisible = false);
-      } else if (delta < -8 && !_headerVisible) {
+      } else if (delta < -5 && !_headerVisible) {
         setState(() => _headerVisible = true);
       }
       _lastScrollOffset = n.metrics.pixels;
@@ -192,10 +190,10 @@ class _HomeScreenState extends State<HomeScreen>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Container(
-                      height: 38,
+                      height: 42,
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: TabBar(
                         controller: _tabController,
@@ -203,19 +201,19 @@ class _HomeScreenState extends State<HomeScreen>
                         dividerHeight: 0,
                         indicator: BoxDecoration(
                           color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         indicatorSize: TabBarIndicatorSize.tab,
                         labelColor: colorScheme.onPrimary,
                         unselectedLabelColor: colorScheme.onSurfaceVariant,
-                        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                        unselectedLabelStyle: const TextStyle(fontSize: 13),
+                        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        unselectedLabelStyle: const TextStyle(fontSize: 14),
                         padding: const EdgeInsets.all(3),
                         tabs: _tabs
                             .map((t) => Tab(
                                   icon: Icon(t.icon, size: 18),
                                   text: t.label,
-                                  height: 32,
+                                  height: 36,
                                 ))
                             .toList(),
                       ),
@@ -235,7 +233,6 @@ class _HomeScreenState extends State<HomeScreen>
                 children: [
                   TabSongList(source: _source),
                   TabLeaderboard(source: _source),
-                  const TabMyList(),
                 ],
               ),
             ),

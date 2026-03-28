@@ -27,10 +27,10 @@ class MiniPlayer extends StatelessWidget {
           : null,
       child: ClipRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
-            height: 52,
-            color: theme.colorScheme.surfaceContainerHigh.withAlpha(204),
+            height: 56,
+            color: theme.colorScheme.surfaceContainerHigh.withAlpha(230),
             child: playMusicInfo != null
                 ? _buildPlayingContent(store, playMusicInfo, theme)
                 : _buildEmptyContent(theme),
