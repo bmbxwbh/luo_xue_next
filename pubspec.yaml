@@ -1,7 +1,7 @@
 name: luo_xue_next
 description: 洛雪Next - Flutter版音乐播放器
 publish_to: 'none'
-version: 26.03.27+26032708
+version: 26.03.28+26032823
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

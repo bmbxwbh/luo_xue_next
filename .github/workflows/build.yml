@@ -26,6 +26,23 @@ jobs:
         with:
           channel: 'stable'
 
+      - name: Set Version
+        id: version
+        run: |
+          # 获取北京时间 (UTC+8)
+          DATE=$(TZ='Asia/Shanghai' date '+%y.%m.%d')
+          HOUR=$(TZ='Asia/Shanghai' date '+%H')
+          VERSION_NAME="${DATE}"
+          VERSION_CODE="${DATE//./}${HOUR}"
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "version_code=${VERSION_CODE}" >> $GITHUB_OUTPUT
+          echo "版本名: ${VERSION_NAME}, 版本号: ${VERSION_CODE}"
+
+      - name: Update pubspec version
+        run: |
+          sed -i "s/^version: .*/version: ${{ steps.version.outputs.version_name }}+${{ steps.version.outputs.version_code }}/" pubspec.yaml
+          grep "version:" pubspec.yaml
+
       - name: Pub Get
         run: flutter pub get
 
@@ -41,11 +58,12 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Build #${{ github.run_number }}
+          tag_name: v${{ steps.version.outputs.version_code }}
+          name: v${{ steps.version.outputs.version_name }}
           body: |
-            🎵 洛雪音乐 Next - 自动构建
-            - 构建时间: ${{ github.event.head_commit.timestamp }}
+            🎵 洛雪音乐 Next - v${{ steps.version.outputs.version_name }}
+            - 版本号: ${{ steps.version.outputs.version_code }}
+            - 构建时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')
             - Commit: ${{ github.event.head_commit.message }}
           files: build/app/outputs/flutter-apk/app-release.apk
           generate_release_notes: true
