@@ -111,7 +111,9 @@ class LuoXueNextApp extends StatelessWidget {
                         brightness: Brightness.dark,
                       ),
               ),
-              themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+              themeMode: settings.followSystem
+                  ? ThemeMode.system
+                  : (settings.isDarkMode ? ThemeMode.dark : ThemeMode.light),
               home: const MainScreen(),
             );
           },

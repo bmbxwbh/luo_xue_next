@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/enums.dart';
@@ -127,7 +128,11 @@ class _HomeScreenState extends State<HomeScreen>
             child: AnimatedOpacity(
               opacity: _headerVisible ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 250),
-              child: Column(
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    color: colorScheme.surface.withValues(alpha: 0.75),
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // 标题行：标题 + 音源选择 + 通知
@@ -222,6 +227,9 @@ class _HomeScreenState extends State<HomeScreen>
                   const SizedBox(height: 8),
                 ],
               ),
+                ), // Container
+                ), // BackdropFilter
+                ), // ClipRect
             ),
           ),
           // Tab内容

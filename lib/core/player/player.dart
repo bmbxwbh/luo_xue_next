@@ -230,6 +230,21 @@ class Player {
       musicInfo: song,
       listId: 'default',
     ));
+
+    // 本地音乐直接播放
+    if (song.source == MusicSource.local && song.localPath != null) {
+      _playerStore.setStatusText('');
+      try {
+        await _audioPlayer.setUrl(song.localPath!);
+        await _audioPlayer.play();
+        _playerStore.setIsPlay(true);
+        _progressManager.startListening();
+      } catch (e) {
+        _playerStore.setStatusText('播放失败: $e');
+      }
+      return;
+    }
+
     await _setMusicUrl(song);
   }
 

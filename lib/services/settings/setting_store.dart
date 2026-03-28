@@ -10,6 +10,7 @@ class SettingStore extends ChangeNotifier {
   String _apiHost = '';
   int _apiPort = 0;
   bool _isDarkMode = false;
+  bool _followSystem = true; // 默认跟随系统
   String _themeColor = 'blue';
 
   // 播放设置
@@ -59,6 +60,7 @@ class SettingStore extends ChangeNotifier {
   String get apiHost => _apiHost;
   int get apiPort => _apiPort;
   bool get isDarkMode => _isDarkMode;
+  bool get followSystem => _followSystem;
   String get themeColor => _themeColor;
   Quality get quality => _quality;
   PlayMode get playMode => _playMode;
@@ -96,6 +98,12 @@ class SettingStore extends ChangeNotifier {
 
   void setDarkMode(bool v) {
     _isDarkMode = v;
+    _followSystem = false;
+    _saveAndNotify();
+  }
+
+  void setFollowSystem(bool v) {
+    _followSystem = v;
     _saveAndNotify();
   }
 
@@ -205,6 +213,7 @@ class SettingStore extends ChangeNotifier {
     _apiHost = prefs.getString('apiHost') ?? '';
     _apiPort = prefs.getInt('apiPort') ?? 0;
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
+    _followSystem = prefs.getBool('followSystem') ?? true;
     _themeColor = prefs.getString('themeColor') ?? 'blue';
     _quality = Quality.fromString(prefs.getString('quality') ?? '320k');
     _playMode = PlayMode.fromString(prefs.getString('playMode') ?? 'listLoop');
@@ -235,6 +244,7 @@ class SettingStore extends ChangeNotifier {
     await prefs.setString('apiHost', _apiHost);
     await prefs.setInt('apiPort', _apiPort);
     await prefs.setBool('isDarkMode', _isDarkMode);
+    await prefs.setBool('followSystem', _followSystem);
     await prefs.setString('themeColor', _themeColor);
     await prefs.setString('quality', _quality.value);
     await prefs.setString('playMode', _playMode.value);
