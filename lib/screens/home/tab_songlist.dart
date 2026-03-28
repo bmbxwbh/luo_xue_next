@@ -1,0 +1,448 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../models/enums.dart';
+import '../../models/playlist_info.dart';
+import '../../services/settings/setting_store.dart';
+import '../../utils/page_transitions.dart';
+import '../../widgets/source_selector.dart';
+import '../../music_sdk/kw/song_list.dart';
+import '../../music_sdk/kg/song_list.dart';
+import '../../music_sdk/wy/song_list.dart';
+import '../../music_sdk/tx/song_list.dart';
+import '../../music_sdk/mg/song_list.dart';
+import '../songlist_detail/songlist_detail_screen.dart';
+
+/// 推荐歌单 Tab
+class TabSongList extends StatefulWidget {
+  const TabSongList({super.key});
+
+  @override
+  State<TabSongList> createState() => _TabSongListState();
+}
+
+class _TabSongListState extends State<TabSongList> {
+  MusicSource _source = MusicSource.kw;
+  String _category = '全部';
+  String? _categoryTagId; // 当前选中分类的 tagId
+  List<PlaylistInfo> _playlists = [];
+  List<_CategoryItem> _categories = [_CategoryItem('全部', null)];
+  bool _isLoading = false;
+  String? _error;
+  int _page = 1;
+  bool _hasMore = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final setting = context.read<SettingStore>();
+    _source = setting.defaultSource;
+    _loadCategories();
+    _loadPlaylists();
+  }
+
+  /// 加载分类标签
+  Future<void> _loadCategories() async {
+    try {
+      List<_CategoryItem> cats = [_CategoryItem('全部', null)];
+      switch (_source) {
+        case MusicSource.kw:
+          final tags = await KwSongList.getTags();
+          final hotTags = tags['hotTag'] as List? ?? [];
+          final tagGroups = tags['tags'] as List? ?? [];
+          // 先添加热门标签
+          for (final t in hotTags) {
+            if (t is Map) {
+              cats.add(_CategoryItem(t['name']?.toString() ?? '', t['id']?.toString()));
+            }
+          }
+          // 再添加分类标签组
+          for (final group in tagGroups) {
+            if (group is Map && group['list'] is List) {
+              for (final t in group['list']) {
+                if (t is Map) {
+                  cats.add(_CategoryItem(t['name']?.toString() ?? '', t['id']?.toString()));
+                }
+              }
+            }
+          }
+          break;
+        case MusicSource.kg:
+          final tags = await KgSongList.getTags();
+          final hotTags = tags['hotTag'] as List? ?? [];
+          final tagGroups = tags['tags'] as List? ?? [];
+          for (final t in hotTags) {
+            if (t is Map) {
+              cats.add(_CategoryItem(t['name']?.toString() ?? '', t['id']?.toString()));
+            }
+          }
+          for (final group in tagGroups) {
+            if (group is Map && group['list'] is List) {
+              for (final t in group['list']) {
+                if (t is Map) {
+                  cats.add(_CategoryItem(t['name']?.toString() ?? '', t['id']?.toString()));
+                }
+              }
+            }
+          }
+          break;
+        case MusicSource.tx:
+          // QQ 音乐静态分类
+          cats.addAll([
+            _CategoryItem('流行', '6'),
+            _CategoryItem('摇滚', '11'),
+            _CategoryItem('民谣', '12'),
+            _CategoryItem('电子', '14'),
+            _CategoryItem('说唱', '15'),
+            _CategoryItem('古典', '16'),
+            _CategoryItem('轻音乐', '17'),
+            _CategoryItem('影视', '18'),
+            _CategoryItem('R&B', '19'),
+            _CategoryItem('华语', '20'),
+          ]);
+          break;
+        case MusicSource.wy:
+          cats.addAll([
+            _CategoryItem('华语', '华语'),
+            _CategoryItem('流行', '流行'),
+            _CategoryItem('摇滚', '摇滚'),
+            _CategoryItem('民谣', '民谣'),
+            _CategoryItem('电子', '电子'),
+            _CategoryItem('说唱', '说唱'),
+            _CategoryItem('古典', '古典'),
+            _CategoryItem('轻音乐', '轻音乐'),
+            _CategoryItem('影视原声', '影视原声'),
+            _CategoryItem('ACG', 'ACG'),
+          ]);
+          break;
+        case MusicSource.local:
+          // 本地音乐不参与在线歌单
+          break;
+      case MusicSource.mg:
+          // 咪咕使用静态分类
+          cats.addAll([
+            _CategoryItem('华语', '15127315'),
+            _CategoryItem('流行', '15127316'),
+            _CategoryItem('摇滚', '15127317'),
+            _CategoryItem('民谣', '15127318'),
+            _CategoryItem('电子', '15127319'),
+            _CategoryItem('古典', '15127320'),
+          ]);
+          break;
+      }
+      if (mounted) {
+        setState(() {
+          _categories = cats;
+        });
+      }
+    } catch (e) {
+      // 加载分类失败时使用默认分类
+      debugPrint('加载分类失败: $e');
+    }
+  }
+
+  /// 加载歌单列表
+  Future<void> _loadPlaylists({bool refresh = false}) async {
+    if (refresh) {
+      _page = 1;
+      _hasMore = true;
+    }
+    if (!_hasMore && !refresh) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      Map<String, dynamic> result;
+      switch (_source) {
+        case MusicSource.kw:
+          result = await KwSongList.getList(
+            'new',
+            _categoryTagId,
+            _page,
+          );
+          break;
+        case MusicSource.kg:
+          // KgSongList.getSongList returns List directly, wrap it
+          final kgList = await KgSongList.getSongList(
+            '5', // 推荐
+            _categoryTagId,
+            _page,
+          );
+          result = {'list': kgList, 'total': null};
+          break;
+        case MusicSource.tx:
+          final sortId = _categoryTagId == null ? 5 : 2; // 5=最热, 2=最新
+          result = await TxSongList.getList(
+            sortId,
+            tagId: _categoryTagId,
+            page: _page,
+          );
+          break;
+        case MusicSource.wy:
+          result = await WySongList.getList(
+            'hot',
+            tagId: _categoryTagId,
+            page: _page,
+          );
+          break;
+        case MusicSource.local:
+          // 本地音乐不参与在线歌单
+          result = {'list': [], 'hasMore': false};
+          break;
+      case MusicSource.mg:
+          result = await MgSongList.getList(
+            'recommend',
+            tagId: _categoryTagId,
+            page: _page,
+          );
+          break;
+      }
+
+      final list = (result['list'] as List? ?? [])
+          .map<PlaylistInfo>((item) => PlaylistInfo(
+                playCount: item['play_count']?.toString() ?? '0',
+                id: item['id']?.toString() ?? '',
+                author: item['author']?.toString() ?? '',
+                name: item['name']?.toString() ?? '',
+                img: item['img']?.toString() ?? '',
+                total: item['total'] is int
+                    ? item['total']
+                    : int.tryParse(item['total']?.toString() ?? '0') ?? 0,
+                desc: item['desc']?.toString() ?? '',
+                source: _source.id,
+              ))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          if (refresh || _page == 1) {
+            _playlists = list;
+          } else {
+            _playlists.addAll(list);
+          }
+          _isLoading = false;
+          final total = result['total'];
+          if (total != null && total is int) {
+            _hasMore = _playlists.length < total;
+          } else {
+            _hasMore = list.isNotEmpty;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = '加载失败: $e';
+        });
+      }
+    }
+  }
+
+  void _onSourceChanged(MusicSource src) {
+    setState(() {
+      _source = src;
+      _category = '全部';
+      _categoryTagId = null;
+    });
+    _loadCategories();
+    _loadPlaylists(refresh: true);
+  }
+
+  void _onCategoryChanged(String cat, String? tagId) {
+    setState(() {
+      _category = cat;
+      _categoryTagId = tagId;
+    });
+    _loadPlaylists(refresh: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // 音源选择器
+        SourceSelector(
+          currentSource: _source,
+          onChanged: _onSourceChanged,
+        ),
+        // 分类标签
+        _buildCategoryChips(),
+        // 歌单内容
+        Expanded(child: _buildContent()),
+      ],
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    return SizedBox(
+      height: 40,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final cat = _categories[index];
+          final selected = cat.name == _category;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(cat.name),
+              selected: selected,
+              onSelected: (_) => _onCategoryChanged(cat.name, cat.tagId),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_isLoading && _playlists.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _playlists.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => _loadPlaylists(refresh: true),
+              icon: const Icon(Icons.refresh),
+              label: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_playlists.isEmpty) {
+      return const Center(child: Text('暂无歌单数据'));
+    }
+    return RefreshIndicator(
+      onRefresh: () => _loadPlaylists(refresh: true),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (scrollInfo) {
+          if (scrollInfo.metrics.pixels >=
+                  scrollInfo.metrics.maxScrollExtent - 200 &&
+              !_isLoading &&
+              _hasMore) {
+            _page++;
+            _loadPlaylists();
+          }
+          return false;
+        },
+        child: GridView.builder(
+          padding: const EdgeInsets.all(12),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: 0.75,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+          ),
+          itemCount: _playlists.length + (_isLoading ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index >= _playlists.length) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return _buildPlaylistCard(_playlists[index]);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaylistCard(PlaylistInfo playlist) {
+    return GestureDetector(
+      onTap: () => _openDetail(playlist),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Hero(
+                      tag: 'playlist_${playlist.id}',
+                      child: playlist.img.isNotEmpty
+                          ? Image.network(
+                              playlist.img,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.music_note, size: 32),
+                              ),
+                            )
+                          : const Center(child: Icon(Icons.music_note, size: 32)),
+                    ),
+                  ),
+                  // 播放数
+                  if (playlist.playCount.isNotEmpty && playlist.playCount != '0')
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.play_arrow, color: Colors.white, size: 12),
+                            const SizedBox(width: 2),
+                            Text(
+                              _formatCount(playlist.playCount),
+                              style: const TextStyle(color: Colors.white, fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            playlist.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCount(String count) {
+    // count 可能已经是 "1.2万" 格式（来自 SDK 格式化），直接返回
+    if (count.contains('万') || count.contains('亿')) return count;
+    final n = int.tryParse(count) ?? 0;
+    if (n >= 10000) return '${(n / 10000).toStringAsFixed(1)}万';
+    return count;
+  }
+
+  void _openDetail(PlaylistInfo playlist) {
+    Navigator.of(context).push(
+      SlideRightRoute(page: SonglistDetailScreen(playlist: playlist)),
+    );
+  }
+}
+
+/// 分类项
+class _CategoryItem {
+  final String name;
+  final String? tagId;
+  const _CategoryItem(this.name, this.tagId);
+}
