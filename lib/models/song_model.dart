@@ -328,44 +328,48 @@ class SongModel {
 
   /// 转换为洛雪音乐源插件需要的 musicInfo 格式
   /// 对齐洛雪原版格式 — 字段名、字段顺序、值必须完全一致
+  /// 对齐洛雪原版 toOldMusicInfo 的输出格式
   Map<String, dynamic> toMusicInfoJson() {
-    // 构建 types 列表
-    final types = meta.qualitys.map((t) => {
-      'type': t.type,
-      if (t.size != null) 'size': t.size,
-    }).toList();
-
-    // 构建 _types map
     final typesMap = <String, dynamic>{};
     for (final t in meta.qualitys) {
       typesMap[t.type] = {if (t.size != null) 'size': t.size};
     }
 
-    // 字段顺序严格对齐洛雪原版: singer, name, albumName, albumId, songmid, copyrightId, source, interval, img, lrc, lrcUrl, mrcUrl, trcUrl, otherSource, types, _types, typeUrl
+    // 字段顺序严格对齐洛雪原版 toOldMusicInfo:
+    // name, singer, source, songmid, interval, albumName, img, typeUrl, albumId, types, _types, [source-specific fields]
     final map = <String, dynamic>{
-      'singer': singer,
       'name': name,
+      'singer': singer,
+      'source': source.id,
+      'songmid': meta.songId, // 原项目用 meta.songId，不是从 id 拆分
+      'interval': interval,
       'albumName': albumName,
-      'albumId': meta.albumId,
-      'songmid': songmid,
+      'img': img ?? '',
+      'typeUrl': <String, dynamic>{},
+      'albumId': meta.albumId ?? '',
+      'types': meta.qualitys.map((t) => {
+        'type': t.type,
+        if (t.size != null) 'size': t.size,
+      }).toList(),
+      '_types': typesMap,
     };
 
-    // copyrightId 追加在 songmid 后面（和原项目一致）
-    if (source.id == 'mg' && meta.copyrightId != null) map['copyrightId'] = meta.copyrightId;
-    if (source.id == 'kg' && meta.hash != null) map['hash'] = meta.hash;
-    if (source.id == 'tx' && meta.strMediaMid != null) map['strMediaMid'] = meta.strMediaMid;
-    if (source.id == 'tx' && meta.albumMid != null) map['albumMid'] = meta.albumMid;
-
-    map['source'] = source.id;
-    map['interval'] = interval;
-    map['img'] = img;
-    // 对齐洛雪原版：只在原项目有这些字段时才传递
-    if (meta.lrcUrl != null) map['lrcUrl'] = meta.lrcUrl;
-    if (meta.mrcUrl != null) map['mrcUrl'] = meta.mrcUrl;
-    if (meta.trcUrl != null) map['trcUrl'] = meta.trcUrl;
-    map['types'] = types;
-    map['_types'] = typesMap;
-    map['typeUrl'] = <String, dynamic>{};
+    // 源特定字段（追加在 _types 之后，和原项目 switch 顺序一致）
+    switch (source.id) {
+      case 'kg':
+        if (meta.hash != null) map['hash'] = meta.hash;
+        break;
+      case 'tx':
+        if (meta.strMediaMid != null) map['strMediaMid'] = meta.strMediaMid;
+        if (meta.albumMid != null) map['albumMid'] = meta.albumMid;
+        break;
+      case 'mg':
+        if (meta.copyrightId != null) map['copyrightId'] = meta.copyrightId;
+        if (meta.lrcUrl != null) map['lrcUrl'] = meta.lrcUrl;
+        if (meta.mrcUrl != null) map['mrcUrl'] = meta.mrcUrl;
+        if (meta.trcUrl != null) map['trcUrl'] = meta.trcUrl;
+        break;
+    }
 
     return map;
   }
