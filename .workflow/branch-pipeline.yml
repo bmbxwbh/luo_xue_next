@@ -1,54 +1,54 @@
 version: '1.0'
-name: branch-pipeline
-displayName: BranchPipeline
-stages:
-  - stage:
-    name: compile
-    displayName: 编译
-    steps:
-      - step: build@gradle
-        name: build_gradle
-        displayName: Gradle 构建
-        # 支持6、7、8、9、10、11六个版本
-        jdkVersion: 8
-        # 支持4.1、4.2、4.3、4.4四个版本
-        gradleVersion: 4.4
-        # 构建命令
-        commands:
-          - chmod +x ./gradlew
-          - ./gradlew build
-        # 非必填字段，开启后表示将构建产物暂存，但不会上传到制品库中，7天后自动清除
-        artifacts:
-            # 构建产物名字，作为产物的唯一标识可向下传递，支持自定义，默认为BUILD_ARTIFACT。在下游可以通过${BUILD_ARTIFACT}方式引用来获取构建物地址
-          - name: BUILD_ARTIFACT
-            # 构建产物获取路径，是指代码编译完毕之后构建物的所在路径，如通常jar包在target目录下。当前目录为代码库根目录
-            path:
-              - ./build
-      - step: publish@general_artifacts
-        name: publish_general_artifacts
-        displayName: 上传制品
-        # 上游构建任务定义的产物名，默认BUILD_ARTIFACT
-        dependArtifact: BUILD_ARTIFACT
-        # 上传到制品库时的制品命名，默认output
-        artifactName: output
-        dependsOn: build_gradle
-  - stage: 
-    name: release
-    displayName: 发布
-    steps:
-      - step: publish@release_artifacts
-        name: publish_release_artifacts
-        displayName: '发布'
-        # 上游上传制品任务的产出
-        dependArtifact: output
-        # 发布制品版本号
-        version: '1.0.0.0'
-        # 是否开启版本号自增，默认开启
-        autoIncrement: true
+name: flutter-build
+displayName: Flutter APK 构建
 triggers:
   push:
     branches:
-      exclude:
-        - master
       include:
-        - .*
+        - main
+        - master
+
+stages:
+  - stage:
+    name: build_apk
+    displayName: 构建 APK
+    steps:
+      - step: build@shell
+        name: flutter_build
+        displayName: Flutter Release 构建
+        commands:
+          # 安装依赖
+          - apt-get update -qq && apt-get install -y -qq curl unzip git xz-utils openjdk-17-jdk
+          # 安装 Flutter
+          - git clone --depth 1 --branch stable https://gitee.com/mirrors/Flutter.git /opt/flutter
+          - export PATH="/opt/flutter/bin:/opt/flutter/bin/cache/dart-sdk/bin:$PATH"
+          - export FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
+          - export PUB_HOSTED_URL=https://pub.flutter-io.cn
+          - flutter precache --android
+          - flutter doctor -v
+          # 安装 Android SDK
+          - mkdir -p /opt/android-sdk/cmdline-tools
+          - cd /opt/android-sdk/cmdline-tools
+          - curl -sL https://mirrors.cloud.tencent.com/AndroidSDK/commandlinetools-linux-11076708_latest.zip -o cmdtools.zip
+          - unzip -q cmdtools.zip && mv cmdline-tools latest
+          - export ANDROID_HOME=/opt/android-sdk
+          - export ANDROID_SDK_ROOT=/opt/android-sdk
+          - export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+          - yes | sdkmanager --licenses > /dev/null 2>&1
+          - sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          # 获取依赖并构建
+          - cd $GITEE_WORKSPACE
+          - flutter pub get
+          - flutter build apk --release
+        # 保存构建产物
+        artifacts:
+          - name: apk
+            path:
+              - build/app/outputs/flutter-apk/app-release.apk
+
+      - step: publish@general_artifacts
+        name: upload_apk
+        displayName: 上传 APK
+        dependArtifact: apk
+        artifactName: luo_xue_next_apk
+        dependsOn: flutter_build
