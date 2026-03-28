@@ -52,7 +52,7 @@ class SettingsScreen extends StatelessWidget {
           _buildSection(context, '关于', [
             ListTile(
               leading: const Icon(Icons.info_outline),
-              title: const Text('洛雪Next'),
+              title: const Text('洛雪NEXT'),
               subtitle: const Text('版本 1.0.0'),
             ),
             ListTile(

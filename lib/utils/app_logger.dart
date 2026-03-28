@@ -106,7 +106,7 @@ class AppLogger extends ChangeNotifier {
   /// 获取所有日志文本
   String exportText() {
     final sb = StringBuffer();
-    sb.writeln('=== 洛雪Next 日志导出 ===');
+    sb.writeln('=== 洛雪NEXT 日志导出 ===');
     sb.writeln('时间: ${DateTime.now()}');
     sb.writeln('日志数量: ${_logs.length}');
     sb.writeln('错误数量: $errorCount');

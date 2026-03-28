@@ -1,5 +1,5 @@
 name: luo_xue_next
-description: 洛雪Next - Flutter版音乐播放器
+description: 洛雪NEXT - Flutter版音乐播放器
 publish_to: 'none'
 version: 26.03.28+26032823
 
@@ -26,6 +26,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon.png"
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/script/
