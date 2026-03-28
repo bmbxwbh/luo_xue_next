@@ -195,7 +195,10 @@ globalThis.lx = {
         for (var i=0;i<allSources.length;i++) {
           var source=allSources[i], userSource=data&&data.sources?data.sources[source]:null;
           if (!userSource||userSource.type!=='music') continue;
-          sourceInfo.sources[source] = { type:'music', actions:supportActions[source].filter(function(a){return userSource.actions.indexOf(a)>=0;}), qualitys:supportQualitys[source].filter(function(q){return userSource.qualitys.indexOf(q)>=0;}) };
+          // 兼容两种格式：ikun.js 有 actions，Huibq 等只有 qualitys
+          var userActions = userSource.actions || supportActions[source];
+          var userQualitys = userSource.qualitys || supportQualitys[source];
+          sourceInfo.sources[source] = { type:'music', actions:supportActions[source].filter(function(a){return userActions.indexOf(a)>=0;}), qualitys:supportQualitys[source].filter(function(q){return userQualitys.indexOf(q)>=0;}) };
         }
       } catch(e) { __pushEvent__('init', {info:null,status:false,errorMessage:e.message}); return Promise.resolve(); }
       __pushEvent__('init', {info:sourceInfo,status:true});
