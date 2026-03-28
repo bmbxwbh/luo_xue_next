@@ -56,3 +56,4 @@ pubspec.lock
 *.hprof
 local.properties
 *.iml
+android/.kotlin/
