@@ -49,3 +49,7 @@ build/
 build/
 .gradle/
 .dart_tool/
+android/app/build/
+android/build/
+android/.gradle/
+pubspec.lock
