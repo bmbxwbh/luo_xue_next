@@ -1,0 +1,68 @@
+version: '1.0'
+name: Flutter Android Build
+triggers:
+  push:
+    branches:
+      - main
+
+stages:
+  - name: build
+    displayName: '构建 APK'
+    steps:
+      - name: checkout
+        displayName: '检出代码'
+        step: 'git_clone'
+        cloneDepth: 1
+
+      - name: setup_flutter
+        displayName: '安装 Flutter SDK'
+        step: 'shell'
+        commands:
+          - 'apt-get update && apt-get install -y curl unzip git'
+          - 'git clone --depth 1 --branch stable https://github.com/flutter/flutter.git /opt/flutter'
+          - 'export PATH="/opt/flutter/bin:$PATH"'
+          - 'flutter precache --android'
+          - 'flutter doctor'
+
+      - name: setup_android
+        displayName: '安装 Android SDK'
+        step: 'shell'
+        commands:
+          - 'mkdir -p /opt/android-sdk'
+          - 'cd /opt/android-sdk'
+          - 'curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdline-tools.zip'
+          - 'unzip -q cmdline-tools.zip'
+          - 'mkdir -p cmdline-tools/latest'
+          - 'mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true'
+          - 'export ANDROID_HOME=/opt/android-sdk'
+          - 'export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"'
+          - 'yes | sdkmanager --licenses'
+          - 'sdkmanager "platforms;android-34" "build-tools;34.0.0"'
+
+      - name: pub_get
+        displayName: '获取依赖'
+        step: 'shell'
+        commands:
+          - 'export PATH="/opt/flutter/bin:$PATH"'
+          - 'export ANDROID_HOME=/opt/android-sdk'
+          - 'export PUB_HOSTED_URL=https://pub.flutter-io.cn'
+          - 'export FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn'
+          - 'flutter pub get'
+
+      - name: build_apk
+        displayName: '构建 Release APK'
+        step: 'shell'
+        commands:
+          - 'export PATH="/opt/flutter/bin:$PATH"'
+          - 'export ANDROID_HOME=/opt/android-sdk'
+          - 'export ANDROID_SDK_ROOT=/opt/android-sdk'
+          - 'export PUB_HOSTED_URL=https://pub.flutter-io.cn'
+          - 'export FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn'
+          - 'flutter build apk --release'
+
+      - name: artifacts
+        displayName: '上传产物'
+        step: 'shell'
+        commands:
+          - 'echo "APK 路径: build/app/outputs/flutter-apk/app-release.apk"'
+          - 'ls -lh build/app/outputs/flutter-apk/app-release.apk'
