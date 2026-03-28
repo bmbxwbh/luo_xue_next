@@ -284,89 +284,159 @@ class SearchScreen extends StatelessWidget {
   }
 }
 
-/// 我的页面
+/// 我的页面 — 全新设计
 class MyScreen extends StatelessWidget {
   const MyScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
+          // 标题
           Text(
             '我的',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
             ),
           ),
+          const SizedBox(height: 20),
+          // 用户信息卡
+          _buildUserCard(context),
+          const SizedBox(height: 16),
+          // 功能网格
+          Row(
+            children: [
+              Expanded(child: _buildGridCard(context, Icons.favorite_rounded, '收藏', Colors.red)),
+              const SizedBox(width: 10),
+              Expanded(child: _buildGridCard(context, Icons.download_rounded, '下载', Colors.green)),
+              const SizedBox(width: 10),
+              Expanded(child: _buildGridCard(context, Icons.history_rounded, '历史', Colors.orange)),
+              const SizedBox(width: 10),
+              Expanded(child: _buildGridCard(context, Icons.access_time_rounded, '稍后', Colors.blue)),
+            ],
+          ),
           const SizedBox(height: 24),
-          // 功能卡片
-          _buildFunctionCard(
-            context,
-            icon: Icons.favorite,
-            color: Colors.red,
-            title: '我的收藏',
-            subtitle: '收藏的歌曲',
-            onTap: () {},
-          ),
-          const SizedBox(height: 8),
-          _buildFunctionCard(
-            context,
-            icon: Icons.download,
-            color: Colors.green,
-            title: '本地下载',
-            subtitle: '已下载的歌曲',
-            onTap: () {},
-          ),
-          const SizedBox(height: 8),
-          _buildFunctionCard(
-            context,
-            icon: Icons.history,
-            color: Colors.orange,
-            title: '播放历史',
-            subtitle: '最近播放记录',
-            onTap: () {},
-          ),
-          const SizedBox(height: 8),
-          _buildFunctionCard(
-            context,
-            icon: Icons.access_time,
-            color: Colors.blue,
-            title: '稍后播放',
-            subtitle: '临时播放列表',
-            onTap: () {},
-          ),
+          // 功能列表
+          _buildListSection(context),
         ],
       ),
     );
   }
 
-  Widget _buildFunctionCard(
-    BuildContext context, {
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: color),
+  Widget _buildUserCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primaryContainer,
+            colorScheme.primaryContainer.withValues(alpha: 0.6),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
       ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: colorScheme.primary,
+            child: Icon(Icons.person, size: 28, color: colorScheme.onPrimary),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '洛雪音乐用户',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '0 首歌曲 · 0 个歌单',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: colorScheme.onPrimaryContainer),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGridCard(BuildContext context, IconData icon, String label, Color color) {
+    return InkWell(
+      onTap: () {},
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 26),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListSection(BuildContext context) {
+    return Column(
+      children: [
+        _buildListItem(context, Icons.playlist_play_rounded, '最近播放', () {}),
+        _buildListItem(context, Icons.album_rounded, '本地音乐', () {}),
+        _buildListItem(context, Icons.cloud_download_rounded, '云盘音乐', () {}),
+        _buildListItem(context, Icons.radio_rounded, '私人FM', () {}),
+      ],
+    );
+  }
+
+  Widget _buildListItem(BuildContext context, IconData icon, String title, VoidCallback onTap) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 20, color: colorScheme.onSecondaryContainer),
+      ),
+      title: Text(title, style: const TextStyle(fontSize: 15)),
+      trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      onTap: onTap,
     );
   }
 }

@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,3 +37,15 @@ jobs:
         with:
           name: luo_xue_next-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Build #${{ github.run_number }}
+          body: |
+            🎵 洛雪音乐 Next - 自动构建
+            - 构建时间: ${{ github.event.head_commit.timestamp }}
+            - Commit: ${{ github.event.head_commit.message }}
+          files: build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true

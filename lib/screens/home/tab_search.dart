@@ -170,58 +170,110 @@ class _TabSearchState extends State<TabSearch> {
 
   Widget _buildSearchBar() {
     final searchStore = context.watch<SearchStore>();
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Column(
         children: [
+          // 搜索框 + 按钮
           Row(
             children: [
-              // 音源选择下拉
-              _buildSourceDropdown(searchStore),
-              const SizedBox(width: 8),
               Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _focusNode,
-                  decoration: InputDecoration(
-                    hintText: '搜索歌曲、歌手',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _showTips = false;
-                                _tips = [];
-                              });
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(22),
                   ),
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => _search(),
-                  onTap: () {
-                    if (_tips.isNotEmpty) {
-                      setState(() => _showTips = true);
-                    }
-                  },
+                  child: Row(
+                    children: [
+                      // 音源选择
+                      PopupMenuButton<MusicSource>(
+                        initialValue: searchStore.tempSource,
+                        onSelected: (src) => searchStore.setTempSource(src),
+                        itemBuilder: (_) => MusicSource.values.map((src) =>
+                          PopupMenuItem(value: src, child: Text(src.name))
+                        ).toList(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          margin: const EdgeInsets.only(left: 4),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                searchStore.tempSource.name,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                size: 16,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      // 输入框
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _focusNode,
+                          decoration: InputDecoration(
+                            hintText: '搜索歌曲、歌手',
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close_rounded, size: 18),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _showTips = false;
+                                        _tips = [];
+                                      });
+                                    },
+                                  )
+                                : null,
+                          ),
+                          style: const TextStyle(fontSize: 14),
+                          textInputAction: TextInputAction.search,
+                          onSubmitted: (_) => _search(),
+                          onTap: () {
+                            if (_tips.isNotEmpty) {
+                              setState(() => _showTips = true);
+                            }
+                          },
+                        ),
+                      ),
+                      // 搜索按钮
+                      Container(
+                        margin: const EdgeInsets.only(right: 4),
+                        child: IconButton(
+                          icon: Icon(Icons.search_rounded, color: colorScheme.primary),
+                          onPressed: _search,
+                          tooltip: '搜索',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _search,
-                child: const Text('搜索'),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          // 搜索类型切换
+          const SizedBox(height: 10),
+          // 搜索类型
           Row(
             children: [
               _buildTypeChip('歌曲', searchStore.searchType == SearchType.music, () {
