@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../models/enums.dart';
 import '../../models/song_model.dart';
 import '../../models/leaderboard_info.dart';
-import '../../services/settings/setting_store.dart';
 import '../../services/player/player_service.dart';
 import '../../music_sdk/index.dart';
 import '../../music_sdk/wy/index.dart';
@@ -11,12 +9,12 @@ import '../../music_sdk/kw/index.dart';
 import '../../music_sdk/kg/index.dart';
 import '../../music_sdk/tx/index.dart';
 import '../../music_sdk/mg/index.dart';
-import '../../widgets/source_selector.dart';
 import '../../widgets/song_list_tile.dart';
 
 /// 排行榜 Tab — 真实数据版
 class TabLeaderboard extends StatefulWidget {
-  const TabLeaderboard({super.key});
+  final MusicSource source;
+  const TabLeaderboard({super.key, required this.source});
 
   @override
   State<TabLeaderboard> createState() => _TabLeaderboardState();
@@ -34,9 +32,17 @@ class _TabLeaderboardState extends State<TabLeaderboard> {
   @override
   void initState() {
     super.initState();
-    final setting = context.read<SettingStore>();
-    _source = setting.defaultSource;
+    _source = widget.source;
     _loadBoards();
+  }
+
+  @override
+  void didUpdateWidget(TabLeaderboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source != widget.source) {
+      _source = widget.source;
+      _loadBoards();
+    }
   }
 
   void _loadBoards() {
@@ -156,32 +162,20 @@ class _TabLeaderboardState extends State<TabLeaderboard> {
       return const Center(child: Text('本地音乐不支持排行榜'));
     }
 
-    return Column(
+    if (_loadingBoards) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Row(
       children: [
-        SourceSelector(
-          currentSource: _source,
-          onChanged: (src) {
-            if (src == MusicSource.local) return;
-            setState(() => _source = src);
-            _loadBoards();
-          },
+        // 左侧榜单列表
+        SizedBox(
+          width: 110,
+          child: _buildBoardList(),
         ),
-        Expanded(
-          child: _loadingBoards
-              ? const Center(child: CircularProgressIndicator())
-              : Row(
-                  children: [
-                    // 左侧榜单列表
-                    SizedBox(
-                      width: 110,
-                      child: _buildBoardList(),
-                    ),
-                    VerticalDivider(width: 1, color: colorScheme.outlineVariant),
-                    // 右侧歌曲列表
-                    Expanded(child: _buildSongList()),
-                  ],
-                ),
-        ),
+        VerticalDivider(width: 1, color: colorScheme.outlineVariant),
+        // 右侧歌曲列表
+        Expanded(child: _buildSongList()),
       ],
     );
   }

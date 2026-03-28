@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/enums.dart';
 import '../../models/playlist_info.dart';
-import '../../services/settings/setting_store.dart';
 import '../../utils/page_transitions.dart';
-import '../../widgets/source_selector.dart';
 import '../../music_sdk/kw/song_list.dart';
 import '../../music_sdk/kg/song_list.dart';
 import '../../music_sdk/wy/song_list.dart';
@@ -14,14 +12,15 @@ import '../songlist_detail/songlist_detail_screen.dart';
 
 /// 推荐歌单 Tab
 class TabSongList extends StatefulWidget {
-  const TabSongList({super.key});
+  final MusicSource source;
+  const TabSongList({super.key, required this.source});
 
   @override
   State<TabSongList> createState() => _TabSongListState();
 }
 
 class _TabSongListState extends State<TabSongList> {
-  MusicSource _source = MusicSource.kw;
+  late MusicSource _source;
   String _category = '全部';
   String? _categoryTagId; // 当前选中分类的 tagId
   List<PlaylistInfo> _playlists = [];
@@ -34,10 +33,21 @@ class _TabSongListState extends State<TabSongList> {
   @override
   void initState() {
     super.initState();
-    final setting = context.read<SettingStore>();
-    _source = setting.defaultSource;
+    _source = widget.source;
     _loadCategories();
     _loadPlaylists();
+  }
+
+  @override
+  void didUpdateWidget(TabSongList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source != widget.source) {
+      _source = widget.source;
+      _category = '全部';
+      _categoryTagId = null;
+      _loadCategories();
+      _loadPlaylists(refresh: true);
+    }
   }
 
   /// 加载分类标签
@@ -241,14 +251,16 @@ class _TabSongListState extends State<TabSongList> {
     }
   }
 
-  void _onSourceChanged(MusicSource src) {
-    setState(() {
-      _source = src;
-      _category = '全部';
-      _categoryTagId = null;
-    });
-    _loadCategories();
-    _loadPlaylists(refresh: true);
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // 分类标签（跟随顶栏隐藏）
+        _buildCategoryChips(),
+        // 歌单内容
+        Expanded(child: _buildContent()),
+      ],
+    );
   }
 
   void _onCategoryChanged(String cat, String? tagId) {
@@ -257,23 +269,6 @@ class _TabSongListState extends State<TabSongList> {
       _categoryTagId = tagId;
     });
     _loadPlaylists(refresh: true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // 音源选择器
-        SourceSelector(
-          currentSource: _source,
-          onChanged: _onSourceChanged,
-        ),
-        // 分类标签
-        _buildCategoryChips(),
-        // 歌单内容
-        Expanded(child: _buildContent()),
-      ],
-    );
   }
 
   Widget _buildCategoryChips() {
