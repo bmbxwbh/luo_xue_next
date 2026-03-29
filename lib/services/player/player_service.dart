@@ -256,6 +256,7 @@ class PlayerService extends ChangeNotifier {
         // 时间到，暂停播放
         if (_isPlaying) {
           _isPlaying = false;
+          globalPlayer.pause();
         }
       }
       notifyListeners();

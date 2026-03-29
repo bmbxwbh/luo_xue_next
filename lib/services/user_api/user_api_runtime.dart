@@ -228,18 +228,17 @@ class UserApiRuntime {
     _pendingRequests[key] = completer;
     _log('调用 handler: source=$source action=$action key=$key');
 
-    // JSON 本身就是合法 JS 表达式，直接赋值，避免双重转义
-    _eval("globalThis.__lx_call_info__=${jsonEncode(info)};");
+    final infoJson = jsonEncode(info);
     final jsCode = '''
-        (function(){try{
+        (function(info){try{
           var handler=__lx_handlers__['request'];
           if(!handler){__pushEvent__('response',{requestKey:'$key',status:false,errorMessage:'Request event is not defined'});return;}
-          handler.call(globalThis.lx, {source:'$source',action:'$action',info:globalThis.__lx_call_info__}).then(function(response){
+          handler.call(globalThis.lx, {source:'$source',action:'$action',info:info}).then(function(response){
             var result;
             switch('$action'){
               case 'musicUrl':
                 if(typeof response!=='string'||response.length>2048||!/^https?:/.test(response))throw new Error('failed');
-                result={source:'$source',action:'$action',data:{type:globalThis.__lx_call_info__.type,url:response}};
+                result={source:'$source',action:'$action',data:{type:info.type,url:response}};
                 break;
               case 'lyric':
                 if(typeof response!=='object'||typeof response.lyric!=='string')throw new Error('failed');
@@ -262,7 +261,7 @@ class UserApiRuntime {
           }).catch(function(err){
             __pushEvent__('response',{requestKey:'$key',status:false,errorMessage:err.message||String(err)});
           });
-        }catch(err){__pushEvent__('response',{requestKey:'$key',status:false,errorMessage:err.message||String(err)});}})()
+        }catch(err){__pushEvent__('response',{requestKey:'$key',status:false,errorMessage:err.message||String(err)});}})($infoJson)
       ''';
     try {
       _log('evaluate jsCode 长度: ${jsCode.length}');

@@ -4,6 +4,7 @@ import '../../services/player/player_service.dart';
 import '../../services/music/list_store.dart';
 import '../../models/lyric_info.dart';
 import '../../utils/format_util.dart';
+import '../../utils/global.dart';
 import '../../models/enums.dart';
 import '../../models/play_music_info.dart';
 
@@ -21,28 +22,6 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   bool _showLyrics = false;
-
-  final LyricInfo _lyricInfo = LyricInfo(
-    lyric: '''[00:00.00] 歌曲名 - 歌手名
-[00:05.00] 这是一首示例歌词
-[00:10.00] 洛雪音乐 Flutter 版
-[00:15.00] 支持歌词滚动显示
-[00:20.00] 点击封面切换歌词
-[00:25.00] 可以控制播放进度
-[00:30.00] 支持多种播放模式
-[00:35.00] 收藏喜欢的歌曲
-[00:40.00] 创建自定义歌单
-[00:45.00] 支持多音源搜索
-[00:50.00] 享受音乐的快乐
-[00:55.00] ...
-[01:00.00] 间奏...
-[01:15.00] 第二段歌词开始
-[01:20.00] 继续展示滚动效果
-[01:25.00] 每行歌词对应时间戳
-[01:30.00] 自动高亮当前行
-[01:35.00] ...
-''',
-  );
 
   @override
   void initState() {
@@ -280,8 +259,30 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
 
   Widget _buildLyrics(PlayerService player) {
     final colorScheme = Theme.of(context).colorScheme;
-    final lines = _lyricInfo.parseLrc();
+    final musicInfo = globalPlayerStore.musicInfo;
+    final lyricInfo = LyricInfo(
+      lyric: musicInfo.lrc ?? '',
+      tlyric: musicInfo.tlrc,
+      rlyric: musicInfo.rlyrc,
+      lxlrc: musicInfo.lxlrc,
+    );
+    final lines = lyricInfo.parseLrc();
     final currentPos = player.position.inMilliseconds / 1000.0;
+
+    if (lines.isEmpty) {
+      return GestureDetector(
+        onTap: _toggleLyrics,
+        child: Center(
+          child: Text(
+            '暂无歌词',
+            style: TextStyle(
+              fontSize: 16,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+      );
+    }
 
     int currentLine = 0;
     for (int i = lines.length - 1; i >= 0; i--) {
