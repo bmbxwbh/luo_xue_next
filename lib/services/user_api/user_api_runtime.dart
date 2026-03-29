@@ -206,18 +206,15 @@ class UserApiRuntime {
         'url': url,
         'ok': resp.statusCode >= 200 && resp.statusCode < 300,
       };
-      final jsSafe = jsonEncode({
+      _eval("handleNativeResponse(${jsonEncode({
         'error': resp.statusCode >= 200 && resp.statusCode < 300 ? null : 'HTTP ${resp.statusCode}',
         'requestKey': key,
         'response': respData,
-      }).replaceAll('\\', '\\\\').replaceAll("'", "\\'");
-      _eval("handleNativeResponse(JSON.parse('$jsSafe'));");
+      })});");
     } catch (e) {
       _log('HTTP 错误 (key=$key): $e', isError: true);
       try {
-        final jsSafe = jsonEncode({'error': e.toString(), 'requestKey': key, 'response': null})
-            .replaceAll('\\', '\\\\').replaceAll("'", "\\'");
-        _eval("handleNativeResponse(JSON.parse('$jsSafe'));");
+        _eval("handleNativeResponse(${jsonEncode({'error': e.toString(), 'requestKey': key, 'response': null})});");
       } catch (e2) {
         _log('❌ 传递 HTTP 错误给 JS 失败: $e2', isError: true);
       }
@@ -231,9 +228,8 @@ class UserApiRuntime {
     _pendingRequests[key] = completer;
     _log('调用 handler: source=$source action=$action key=$key');
 
-    // 使用 JSON.stringify 传数据（与洛雪原版一致），避免特殊字符问题
-    final infoJson = jsonEncode(info).replaceAll('\\', '\\\\').replaceAll("'", "\\'");
-    _eval("globalThis.__lx_call_info__=JSON.parse('$infoJson');");
+    // JSON 本身就是合法 JS 表达式，直接赋值，避免双重转义
+    _eval("globalThis.__lx_call_info__=${jsonEncode(info)};");
     final jsCode = '''
         (function(){try{
           var handler=__lx_handlers__['request'];
