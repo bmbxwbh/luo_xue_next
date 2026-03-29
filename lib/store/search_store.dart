@@ -47,6 +47,10 @@ class SearchStore extends ChangeNotifier {
   final List<String> _historyList = [];
   List<String> get historyList => List.unmodifiable(_historyList);
 
+  /// 最近搜索（最多5条）
+  List<String> get recentSearches =>
+      List.unmodifiable(_historyList.take(5));
+
   // ============ Mutations ============
 
   void setTempSource(MusicSource source) {
@@ -78,9 +82,9 @@ class SearchStore extends ChangeNotifier {
     if (text.trim().isEmpty) return;
     _historyList.remove(text);
     _historyList.insert(0, text);
-    // 限制历史记录数量
-    if (_historyList.length > 50) {
-      _historyList.removeRange(50, _historyList.length);
+    // 限制历史记录数量（最近5条）
+    if (_historyList.length > 5) {
+      _historyList.removeRange(5, _historyList.length);
     }
     notifyListeners();
   }

@@ -8,6 +8,7 @@ import '../../models/enums.dart';
 import '../../services/music/list_store.dart';
 import '../../services/music/local_music_service.dart';
 import '../../services/player/player_service.dart';
+import '../../store/player_store.dart';
 import '../../widgets/song_list_tile.dart';
 
 /// 我的歌单 Tab
@@ -39,10 +40,18 @@ class _TabMyListState extends State<TabMyList> {
   }
 
   Widget _buildOverview(ListStore listStore, LocalMusicService localService) {
+    final playerStore = context.watch<PlayerStore>();
+    final totalSongs = listStore.allLists.fold<int>(0, (sum, l) => sum + l.musicCount);
+    final recentCount = playerStore.playedList.length;
+    final favCount = listStore.loveList?.musicCount ?? 0;
+
     return SafeArea(
       child: ListView(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       children: [
+        // 统计卡片
+        _buildStatsCard(totalSongs, recentCount, favCount),
+        const SizedBox(height: 12),
         // 本地音乐入口
         _buildFeatureTile(
           icon: Icons.library_music,
@@ -71,7 +80,14 @@ class _TabMyListState extends State<TabMyList> {
             onTap: () => setState(() => _selectedListId = listStore.loveList!.id),
           ),
         const SizedBox(height: 16),
-        // 歌单标题
+        // 系统歌单（isDefault=true，排除 love）
+        ..._buildPlaylistSection(
+          title: '系统歌单',
+          lists: listStore.allLists.where((l) => l.isDefault && l.id != 'love').toList(),
+          listStore: listStore,
+        ),
+        const SizedBox(height: 16),
+        // 我的歌单（isDefault=false）
         Row(
           children: [
             Text(
@@ -89,17 +105,77 @@ class _TabMyListState extends State<TabMyList> {
           ],
         ),
         const SizedBox(height: 8),
-        // 用户歌单
         ...listStore.userLists.map(
           (list) => _buildListTile(list, listStore),
         ),
-        // 默认歌单（非 love）
-        ...listStore.allLists
-            .where((l) => l.isDefault && l.id != 'love')
-            .map((list) => _buildListTile(list, listStore)),
         const SizedBox(height: 80),
       ],
     ),
+    );
+  }
+
+  List<Widget> _buildPlaylistSection({
+    required String title,
+    required List<UserList> lists,
+    required ListStore listStore,
+  }) {
+    if (lists.isEmpty) return [];
+    return [
+      Text(
+        title,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+      ),
+      const SizedBox(height: 8),
+      ...lists.map((list) => _buildListTile(list, listStore)),
+    ];
+  }
+
+  Widget _buildStatsCard(int totalSongs, int recentCount, int favCount) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          _buildStatItem(totalSongs.toString(), '总歌曲数', Colors.blue),
+          Container(width: 1, height: 32, color: colorScheme.outlineVariant),
+          _buildStatItem(recentCount.toString(), '最近播放', Colors.orange),
+          Container(width: 1, height: 32, color: colorScheme.outlineVariant),
+          _buildStatItem(favCount.toString(), '收藏数', Colors.red),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String value, String label, Color color) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

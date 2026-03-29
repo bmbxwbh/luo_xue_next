@@ -28,39 +28,61 @@ class SongListTile extends StatelessWidget {
     final playerStore = context.watch<PlayerStore>();
     final isPlaying = playerStore.playMusicInfo?.musicId == song.id;
 
-    return ListTile(
-      leading: _buildLeading(context, isPlaying),
-      title: Text(
-        FormatUtil.decodeName(song.name),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: isPlaying ? theme.colorScheme.primary : null,
-          fontWeight: isPlaying ? FontWeight.bold : null,
-        ),
+    return Dismissible(
+      key: ValueKey('${song.id}_$index'),
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 16),
+        color: Colors.grey,
+        child: const Icon(Icons.delete, color: Colors.white),
       ),
-      subtitle: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '${FormatUtil.formatSingerName(song.singer)} - ${FormatUtil.decodeName(song.albumName)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall,
-            ),
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        color: Colors.red,
+        child: const Icon(Icons.favorite, color: Colors.white),
+      ),
+      onDismissed: (direction) {
+        if (direction == DismissDirection.startToEnd) {
+          _deleteSong(context);
+        } else {
+          _favoriteSong(context);
+        }
+      },
+      child: ListTile(
+        leading: _buildLeading(context, isPlaying),
+        title: Text(
+          FormatUtil.decodeName(song.name),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: isPlaying ? theme.colorScheme.primary : null,
+            fontWeight: isPlaying ? FontWeight.bold : null,
           ),
-          if (song.interval.isNotEmpty)
-            Text(
-              song.interval,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+        ),
+        subtitle: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${FormatUtil.formatSingerName(song.singer)} - ${FormatUtil.decodeName(song.albumName)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall,
               ),
             ),
-        ],
+            if (song.interval.isNotEmpty)
+              Text(
+                song.interval,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+        trailing: _buildTrailing(context),
+        onTap: onTap ?? () => _playSong(context),
+        onLongPress: () => _showContextMenu(context),
       ),
-      trailing: _buildTrailing(context),
-      onTap: onTap ?? () => _playSong(context),
-      onLongPress: () => _showContextMenu(context),
     );
   }
 
@@ -163,6 +185,24 @@ class SongListTile extends StatelessWidget {
 
   void _playSong(BuildContext context) {
     globalPlayer.playMusic(song);
+  }
+
+  void _deleteSong(BuildContext context) {
+    if (listId != null) {
+      final listStore = context.read<ListStore>();
+      listStore.removeSongFromList(listId!, song.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已删除')),
+      );
+    }
+  }
+
+  void _favoriteSong(BuildContext context) {
+    final listStore = context.read<ListStore>();
+    listStore.addSongToList('love', song.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已收藏')),
+    );
   }
 
   void _showContextMenu(BuildContext context) {

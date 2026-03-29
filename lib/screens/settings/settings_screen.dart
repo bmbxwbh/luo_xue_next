@@ -31,6 +31,10 @@ class SettingsScreen extends StatelessWidget {
             _buildUserApiConfig(context),
             _buildTheme(context),
           ]),
+          _buildSection(context, '外观', [
+            _buildThemeMode(context),
+            _buildThemeColorPicker(context),
+          ]),
           _buildSection(context, '播放设置', [
             _buildQuality(context),
             _buildPlayMode(context),
@@ -373,6 +377,89 @@ class SettingsScreen extends StatelessWidget {
             onChanged: (v) {
               if (v != null) {
                 store.setThemeColor(v);
+                Navigator.pop(ctx);
+              }
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildThemeColorPicker(BuildContext context) {
+    final store = context.watch<SettingStore>();
+    const colors = [
+      {'key': 'purple', 'color': Colors.purple},
+      {'key': 'blue', 'color': Colors.blue},
+      {'key': 'green', 'color': Colors.green},
+      {'key': 'orange', 'color': Colors.orange},
+      {'key': 'red', 'color': Colors.red},
+      {'key': 'pink', 'color': Colors.pink},
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: colors.map((c) {
+          final isSelected = store.themeColor == c['key'];
+          return GestureDetector(
+            onTap: () => store.setThemeColor(c['key'] as String),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: c['color'] as Color,
+                border: isSelected
+                    ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3)
+                    : null,
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                  : null,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildThemeMode(BuildContext context) {
+    final store = context.watch<SettingStore>();
+    const labels = {
+      'system': '跟随系统',
+      'light': '浅色模式',
+      'dark': '深色模式',
+    };
+    return ListTile(
+      leading: const Icon(Icons.brightness_6),
+      title: const Text('深色模式'),
+      subtitle: Text(labels[store.themeMode] ?? store.themeMode),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _showThemeModePicker(context),
+    );
+  }
+
+  void _showThemeModePicker(BuildContext context) {
+    final store = context.read<SettingStore>();
+    const modes = ['system', 'light', 'dark'];
+    const labels = {
+      'system': '跟随系统',
+      'light': '浅色模式',
+      'dark': '深色模式',
+    };
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView(
+        shrinkWrap: true,
+        children: modes.map((m) {
+          return RadioListTile<String>(
+            title: Text(labels[m] ?? m),
+            value: m,
+            groupValue: store.themeMode,
+            onChanged: (v) {
+              if (v != null) {
+                store.setThemeMode(v);
                 Navigator.pop(ctx);
               }
             },

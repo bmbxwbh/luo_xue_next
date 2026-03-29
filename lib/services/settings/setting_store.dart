@@ -63,6 +63,12 @@ class SettingStore extends ChangeNotifier {
   bool get isDarkMode => _isDarkMode;
   bool get followSystem => _followSystem;
   String get themeColor => _themeColor;
+
+  /// 主题模式: system / light / dark
+  String get themeMode {
+    if (_followSystem) return 'system';
+    return _isDarkMode ? 'dark' : 'light';
+  }
   Quality get quality => _quality;
   PlayMode get playMode => _playMode;
   double get volume => _volume;
@@ -111,6 +117,21 @@ class SettingStore extends ChangeNotifier {
 
   void setThemeColor(String v) {
     _themeColor = v;
+    _saveAndNotify();
+  }
+
+  void setThemeMode(String mode) {
+    switch (mode) {
+      case 'system':
+        _followSystem = true;
+        _isDarkMode = false;
+      case 'light':
+        _followSystem = false;
+        _isDarkMode = false;
+      case 'dark':
+        _followSystem = false;
+        _isDarkMode = true;
+    }
     _saveAndNotify();
   }
 

@@ -244,6 +244,8 @@ class _TabSearchState extends State<TabSearch> {
                                       setState(() {
                                         _showTips = false;
                                         _tips = [];
+                                        _hasSearched = false;
+                                        _results = [];
                                       });
                                     },
                                   )
@@ -411,8 +413,9 @@ class _TabSearchState extends State<TabSearch> {
 
   Widget _buildHistory() {
     final searchStore = context.watch<SearchStore>();
+    final recent = searchStore.recentSearches;
 
-    if (searchStore.historyList.isEmpty) {
+    if (recent.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -436,20 +439,20 @@ class _TabSearchState extends State<TabSearch> {
             ),
           ],
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: searchStore.historyList.map((kw) {
-            return InputChip(
-              label: Text(kw),
-              onPressed: () {
+        ...recent.map((kw) => ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.history, size: 20),
+              title: Text(kw, style: const TextStyle(fontSize: 14)),
+              trailing: IconButton(
+                icon: const Icon(Icons.close, size: 16),
+                onPressed: () => searchStore.removeHistory(kw),
+              ),
+              onTap: () {
                 _searchController.text = kw;
                 _search();
               },
-              onDeleted: () => searchStore.removeHistory(kw),
-            );
-          }).toList(),
-        ),
+            )),
       ],
     );
   }
