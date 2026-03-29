@@ -32,6 +32,7 @@ class _TabSearchState extends State<TabSearch> {
   String? _error;
   int _currentPage = 1;
   late MusicSearchService _searchService;
+  bool _isAggregateSearch = false;
 
   @override
   void initState() {
@@ -78,7 +79,7 @@ class _TabSearchState extends State<TabSearch> {
     }
   }
 
-  Future<void> _search() async {
+  Future<void> _search({bool aggregate = false}) async {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) return;
 
@@ -92,14 +93,41 @@ class _TabSearchState extends State<TabSearch> {
       _isLoading = true;
       _error = null;
       _currentPage = 1;
+      _isAggregateSearch = aggregate;
     });
 
     try {
-      final results = await _searchService.search(
-        keyword,
-        searchStore.tempSource,
-        _currentPage,
-      );
+      List<SongModel> results;
+      if (_isAggregateSearch) {
+        final futures = <Future<List<SongModel>>>[];
+        for (final source in MusicSource.values.where((s) => s != MusicSource.local)) {
+          futures.add(
+            _searchService.search(keyword, source, _currentPage)
+                .catchError((_) => <SongModel>[])
+          );
+        }
+        final allResults = await Future.wait(futures);
+        results = [];
+        for (final list in allResults) {
+          results.addAll(list);
+        }
+        final seen = <String>{};
+        final deduplicated = <SongModel>[];
+        for (final song in results) {
+          final key = '${song.name}_${song.singer}';
+          if (!seen.contains(key)) {
+            seen.add(key);
+            deduplicated.add(song);
+          }
+        }
+        results = deduplicated;
+      } else {
+        results = await _searchService.search(
+          keyword,
+          searchStore.tempSource,
+          _currentPage,
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -190,39 +218,57 @@ class _TabSearchState extends State<TabSearch> {
                   ),
                   child: Row(
                     children: [
-                      // 音源选择
-                      PopupMenuButton<MusicSource>(
-                        initialValue: searchStore.tempSource,
-                        onSelected: (src) => searchStore.setTempSource(src),
-                        itemBuilder: (_) => MusicSource.values.map((src) =>
-                          PopupMenuItem(value: src, child: Text(src.name))
-                        ).toList(),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          margin: const EdgeInsets.only(left: 4),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(16),
+                      // 聚合搜索开关
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FilterChip(
+                            label: const Text('聚合', style: TextStyle(fontSize: 11)),
+                            selected: _isAggregateSearch,
+                            onSelected: (v) {
+                              if (v) {
+                                _search(aggregate: true);
+                              }
+                            },
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            visualDensity: VisualDensity.compact,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                searchStore.tempSource.name,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: colorScheme.onPrimaryContainer,
+                          if (!_isAggregateSearch) ...[
+                            PopupMenuButton<MusicSource>(
+                              initialValue: searchStore.tempSource,
+                              onSelected: (src) => searchStore.setTempSource(src),
+                              itemBuilder: (_) => MusicSource.values.map((src) =>
+                                PopupMenuItem(value: src, child: Text(src.name))
+                              ).toList(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                margin: const EdgeInsets.only(left: 4),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      searchStore.tempSource.name,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_drop_down,
+                                      size: 16,
+                                      color: colorScheme.onPrimaryContainer,
+                                    ),
+                                  ],
                                 ),
                               ),
-                              Icon(
-                                Icons.arrow_drop_down,
-                                size: 16,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                            ],
-                          ),
-                        ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(width: 4),
                       // 输入框
@@ -246,6 +292,7 @@ class _TabSearchState extends State<TabSearch> {
                                         _tips = [];
                                         _hasSearched = false;
                                         _results = [];
+                                        _isAggregateSearch = false;
                                       });
                                     },
                                   )
@@ -266,7 +313,7 @@ class _TabSearchState extends State<TabSearch> {
                         margin: const EdgeInsets.only(right: 4),
                         child: IconButton(
                           icon: Icon(Icons.search_rounded, color: colorScheme.primary),
-                          onPressed: _search,
+                          onPressed: () => _search(aggregate: _isAggregateSearch),
                           tooltip: '搜索',
                         ),
                       ),
@@ -481,7 +528,7 @@ class _TabSearchState extends State<TabSearch> {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _search,
+              onPressed: () => _search(aggregate: _isAggregateSearch),
               icon: const Icon(Icons.refresh),
               label: const Text('重试'),
             ),
@@ -513,11 +560,52 @@ class _TabSearchState extends State<TabSearch> {
               ),
             );
           }
-          return SongListTile(
-            song: _results[index],
-            index: index,
-            listId: 'search',
-          );
+          return _buildResultItem(_results[index], index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildResultItem(SongModel song, int index) {
+    final sourceColors = {
+      MusicSource.kw: Colors.orange,
+      MusicSource.kg: Colors.red,
+      MusicSource.tx: Colors.green,
+      MusicSource.wy: Colors.blue,
+      MusicSource.mg: Colors.purple,
+      MusicSource.local: Colors.grey,
+    };
+    final color = sourceColors[song.source] ?? Colors.grey;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withAlpha(30),
+          child: const Icon(Icons.music_note, size: 20),
+        ),
+        title: Row(
+          children: [
+            Expanded(child: Text(song.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+            if (_isAggregateSearch)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                margin: const EdgeInsets.only(left: 8),
+                decoration: BoxDecoration(
+                  color: color.withAlpha(30),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  song.source.name,
+                  style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Text(song.singer, maxLines: 1, overflow: TextOverflow.ellipsis),
+        onTap: () {
+          final player = context.read<PlayerService>();
+          player.playSong(song, listId: 'search');
         },
       ),
     );

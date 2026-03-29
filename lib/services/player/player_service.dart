@@ -23,6 +23,7 @@ class PlayerService extends ChangeNotifier {
   int _timeoutMinutes = 0; // 0 表示不启用
   int _timeoutRemaining = 0; // 剩余秒数
   Timer? _timeoutTimer;
+  bool _stopAfterCurrentSong = false; // 播完当前歌曲再停
 
   // ===== 后台播放计时器 =====
   Timer? _delayNextTimer;
@@ -62,12 +63,24 @@ class PlayerService extends ChangeNotifier {
   // ===== 定时停止 getter =====
   int get timeoutMinutes => _timeoutMinutes;
   int get timeoutRemaining => _timeoutRemaining;
+  bool get stopAfterCurrentSong => _stopAfterCurrentSong;
 
   /// 格式化定时剩余时间 "MM:SS"
   String get timeoutStr {
     final m = (_timeoutRemaining ~/ 60).toString().padLeft(2, '0');
     final s = (_timeoutRemaining % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  /// 切换"播完当前歌曲再停"
+  void toggleStopAfterCurrentSong() {
+    _stopAfterCurrentSong = !_stopAfterCurrentSong;
+    notifyListeners();
+  }
+
+  void setStopAfterCurrentSong(bool value) {
+    _stopAfterCurrentSong = value;
+    notifyListeners();
   }
 
   double get progress {
@@ -182,6 +195,20 @@ class PlayerService extends ChangeNotifier {
   }
 
   void playNext() {
+    // 如果启用了"播完当前歌曲再停"，则暂停播放并停止定时器
+    if (_stopAfterCurrentSong && _timeoutMinutes > 0) {
+      _stopAfterCurrentSong = false;
+      _timeoutTimer?.cancel();
+      _timeoutTimer = null;
+      _timeoutMinutes = 0;
+      _timeoutRemaining = 0;
+      if (_isPlaying) {
+        _isPlaying = false;
+        globalPlayer.pause();
+      }
+      notifyListeners();
+      return;
+    }
     _playAction = 'next';
     notifyListeners();
     _playAction = null;

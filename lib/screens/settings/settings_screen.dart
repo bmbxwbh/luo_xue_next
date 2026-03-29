@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/enums.dart';
 import '../../services/settings/setting_store.dart';
+import '../../services/player/player_service.dart';
 import '../../services/user_api/user_api_manager.dart';
 import '../../utils/app_logger.dart';
 import '../../utils/page_transitions.dart';
@@ -30,6 +33,7 @@ class SettingsScreen extends StatelessWidget {
             _buildSourceDisplay(context),
             _buildUserApiConfig(context),
             _buildTheme(context),
+            _buildDownloadManager(context),
           ]),
           _buildSection(context, '外观', [
             _buildThemeMode(context),
@@ -42,6 +46,7 @@ class SettingsScreen extends StatelessWidget {
             _buildSpeed(context),
             _buildCache(context),
             _buildTimeoutExit(context),
+            _buildEqualizer(context),
           ]),
           _buildSection(context, '搜索设置', [
             _buildHotSearch(context),
@@ -149,6 +154,117 @@ class SettingsScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildDownloadManager(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.download),
+      title: const Text('下载管理'),
+      subtitle: const Text('查看下载文件、清除缓存'),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _showDownloadManagerDialog(context),
+    );
+  }
+
+  void _showDownloadManagerDialog(BuildContext context) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final downloadPath = '${dir.path}/downloads';
+    final downloadDir = Directory(downloadPath);
+    
+    int totalSize = 0;
+    int fileCount = 0;
+    if (await downloadDir.exists()) {
+      final files = downloadDir.listSync(recursive: true);
+      for (final file in files) {
+        if (file is File) {
+          totalSize += await file.length();
+          fileCount++;
+        }
+      }
+    }
+
+    final sizeStr = _formatFileSize(totalSize);
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('下载管理'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.folder),
+              title: const Text('下载目录'),
+              subtitle: Text(downloadPath, style: const TextStyle(fontSize: 12)),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.storage),
+              title: const Text('已下载文件'),
+              subtitle: Text('$fileCount 个文件 (共 $sizeStr)'),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.folder_open),
+                    label: const Text('打开目录'),
+                    onPressed: () async {
+                      final uri = Uri.file(downloadPath);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.delete_sweep),
+                    label: const Text('清除缓存'),
+                    onPressed: () async {
+                      if (!await downloadDir.exists()) {
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        return;
+                      }
+                      final files = downloadDir.listSync();
+                      for (final file in files) {
+                        await file.delete(recursive: true);
+                      }
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('下载缓存已清除')),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   void _showUserApiDialog(BuildContext context) {
@@ -575,10 +691,79 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildTimeoutExit(BuildContext context) {
-    return const ListTile(
-      leading: Icon(Icons.timer),
-      title: Text('定时关闭'),
-      subtitle: Text('未开启'),
+    final player = context.watch<PlayerService>();
+    final hasTimeout = player.timeoutMinutes > 0;
+    final stopAfterCurrent = player.stopAfterCurrentSong;
+
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.timer),
+          title: const Text('定时关闭'),
+          subtitle: Text(hasTimeout ? '剩余 ${player.timeoutStr}' : '未开启'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showTimeoutPicker(context),
+        ),
+        if (hasTimeout)
+          SwitchListTile(
+            secondary: const SizedBox(width: 48),
+            title: const Text('播完当前歌曲再停'),
+            subtitle: Text(stopAfterCurrent ? '已开启' : '已关闭'),
+            value: stopAfterCurrent,
+            onChanged: (v) => player.setStopAfterCurrentSong(v),
+          ),
+      ],
+    );
+  }
+
+  void _showTimeoutPicker(BuildContext context) {
+    final player = context.read<PlayerService>();
+    final options = [
+      {'label': '不开启', 'minutes': 0},
+      {'label': '10 分钟', 'minutes': 10},
+      {'label': '20 分钟', 'minutes': 20},
+      {'label': '30 分钟', 'minutes': 30},
+      {'label': '45 分钟', 'minutes': 45},
+      {'label': '60 分钟', 'minutes': 60},
+      {'label': '90 分钟', 'minutes': 90},
+      {'label': '120 分钟', 'minutes': 120},
+    ];
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView(
+        shrinkWrap: true,
+        children: options.map((o) {
+          return RadioListTile<int>(
+            title: Text(o['label'] as String),
+            value: o['minutes'] as int,
+            groupValue: player.timeoutMinutes,
+            onChanged: (v) {
+              if (v != null) {
+                player.setTimeoutExit(v);
+                Navigator.pop(ctx);
+              }
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildEqualizer(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.equalizer),
+      title: const Text('均衡器'),
+      subtitle: const Text('功能开发中'),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('均衡器功能开发中，敬请期待'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      },
     );
   }
 

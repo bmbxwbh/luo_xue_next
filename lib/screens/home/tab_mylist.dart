@@ -9,7 +9,17 @@ import '../../services/music/list_store.dart';
 import '../../services/music/local_music_service.dart';
 import '../../services/player/player_service.dart';
 import '../../store/player_store.dart';
+import '../../store/list_store.dart' as app_store;
 import '../../widgets/song_list_tile.dart';
+
+enum SortType {
+  addTime('按添加时间'),
+  songName('按歌曲名'),
+  singerName('按歌手名');
+
+  final String label;
+  const SortType(this.label);
+}
 
 /// 我的歌单 Tab
 class TabMyList extends StatefulWidget {
@@ -21,6 +31,10 @@ class TabMyList extends StatefulWidget {
 
 class _TabMyListState extends State<TabMyList> {
   String? _selectedListId;
+  SortType _sortType = SortType.addTime;
+  bool _batchMode = false;
+  final Set<String> _selectedIds = {};
+  List<SongModel> _sortedSongs = [];
 
   @override
   Widget build(BuildContext context) {
@@ -364,6 +378,11 @@ class _TabMyListState extends State<TabMyList> {
 
   /// 歌单内歌曲视图
   Widget _buildSongListView(UserList list, ListStore listStore) {
+    final appListStore = context.read<app_store.ListStore>();
+    final songs = appListStore.getListMusics(list.id);
+    
+    _sortedSongs = _sortSongs(songs);
+
     return Column(
       children: [
         Container(
@@ -378,49 +397,289 @@ class _TabMyListState extends State<TabMyList> {
               end: Alignment.bottomCenter,
             ),
           ),
-          child: Row(
+          child: Column(
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => setState(() => _selectedListId = null),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      _exitBatchMode();
+                      setState(() => _selectedListId = null);
+                    },
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          list.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${list.musicCount} 首歌曲',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!_batchMode) ...[
+                    IconButton(
+                      icon: const Icon(Icons.sort),
+                      tooltip: '排序',
+                      onPressed: () => _showSortMenu(context),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.playlist_add_check),
+                      tooltip: '批量管理',
+                      onPressed: () => setState(() => _batchMode = true),
+                    ),
+                  ] else
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: '退出批量模式',
+                      onPressed: _exitBatchMode,
+                    ),
+                ],
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      list.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+              if (_batchMode)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      Text('已选择 ${_selectedIds.length} 项'),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          if (_selectedIds.length == songs.length) {
+                            setState(() => _selectedIds.clear());
+                          } else {
+                            setState(() => _selectedIds.addAll(songs.map((s) => s.id)));
+                          }
+                        },
+                        child: Text(_selectedIds.length == songs.length ? '取消全选' : '全选'),
                       ),
-                    ),
-                    Text(
-                      '${list.musicCount} 首歌曲',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
         Expanded(
           child: list.musicIds.isEmpty
               ? const Center(child: Text('歌单为空'))
-              : ListView.builder(
-                  itemCount: list.musicIds.length,
-                  itemBuilder: (context, index) {
-                    final id = list.musicIds[index];
-                    return ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.music_note, size: 20)),
-                      title: Text('歌曲 $id'),
-                      subtitle: const Text('添加歌曲后显示详情'),
-                    );
-                  },
-                ),
+              : _buildSongList(songs, listStore),
         ),
+        if (_batchMode) _buildBatchActionBar(list, listStore),
       ],
+    );
+  }
+
+  List<SongModel> _sortSongs(List<SongModel> songs) {
+    final sorted = List<SongModel>.from(songs);
+    switch (_sortType) {
+      case SortType.addTime:
+        break;
+      case SortType.songName:
+        sorted.sort((a, b) => a.name.compareTo(b.name));
+        break;
+      case SortType.singerName:
+        sorted.sort((a, b) => a.singer.compareTo(b.singer));
+        break;
+    }
+    return sorted;
+  }
+
+  Widget _buildSongList(List<SongModel> songs, ListStore listStore) {
+    if (songs.isEmpty) {
+      return ListView.builder(
+        itemCount: listStore.getList(_selectedListId!)?.musicIds.length ?? 0,
+        itemBuilder: (context, index) {
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.blue.withAlpha(30),
+              child: const Icon(Icons.music_note, size: 20),
+            ),
+            title: Text('歌曲 ${index + 1}'),
+            subtitle: const Text('添加歌曲后显示详情'),
+          );
+        },
+      );
+    }
+
+    return ListView.builder(
+      itemCount: songs.length,
+      itemBuilder: (context, index) {
+        final song = songs[index];
+        return ListTile(
+          leading: _batchMode
+              ? Checkbox(
+                  value: _selectedIds.contains(song.id),
+                  onChanged: (v) {
+                    setState(() {
+                      if (v == true) {
+                        _selectedIds.add(song.id);
+                      } else {
+                        _selectedIds.remove(song.id);
+                      }
+                    });
+                  },
+                )
+              : CircleAvatar(
+                  backgroundColor: Colors.blue.withAlpha(30),
+                  child: const Icon(Icons.music_note, size: 20),
+                ),
+          title: Text(song.name.isEmpty ? '歌曲 ${index + 1}' : song.name),
+          subtitle: Text(song.singer.isEmpty ? '添加歌曲后显示详情' : song.singer),
+          onTap: () {
+            if (_batchMode) {
+              setState(() {
+                if (_selectedIds.contains(song.id)) {
+                  _selectedIds.remove(song.id);
+                } else {
+                  _selectedIds.add(song.id);
+                }
+              });
+            } else {
+              final player = context.read<PlayerService>();
+              player.playSong(song, listId: _selectedListId ?? 'default');
+            }
+          },
+        );
+      },
+    );
+  }
+
+  void _exitBatchMode() {
+    setState(() {
+      _batchMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  Widget _buildBatchActionBar(UserList list, ListStore listStore) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('删除选中'),
+                onPressed: _selectedIds.isEmpty ? null : () => _deleteSelected(list, listStore),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                icon: const Icon(Icons.drive_file_move_outline),
+                label: const Text('移动到歌单'),
+                onPressed: _selectedIds.isEmpty ? null : () => _showMoveToDialog(list, listStore),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSortMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('排序方式', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            ...SortType.values.map((type) => RadioListTile<SortType>(
+              title: Text(type.label),
+              value: type,
+              groupValue: _sortType,
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => _sortType = v);
+                  Navigator.pop(ctx);
+                }
+              },
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _deleteSelected(UserList list, ListStore listStore) {
+    final appListStore = context.read<app_store.ListStore>();
+    for (final id in _selectedIds) {
+      appListStore.removeMusicFromList(list.id, id);
+    }
+    _exitBatchMode();
+  }
+
+  void _showMoveToDialog(UserList list, ListStore listStore) {
+    final appListStore = context.read<app_store.ListStore>();
+    final targetLists = appListStore.allListIds.where((id) => id != list.id).toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('移动到歌单', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: targetLists.map((targetId) {
+                  final listName = targetId == appListStore.defaultListId 
+                      ? appListStore.defaultListName 
+                      : targetId == appListStore.loveListId 
+                          ? appListStore.loveListName 
+                          : targetId;
+                  return ListTile(
+                    leading: const Icon(Icons.folder),
+                    title: Text(listName),
+                    onTap: () {
+                      final songsToMove = <SongModel>[];
+                      final sourceSongs = appListStore.getListMusics(list.id);
+                      for (final songId in _selectedIds) {
+                        final song = sourceSongs.firstWhere(
+                          (s) => s.id == songId,
+                          orElse: () => SongModel(
+                            id: songId, name: '', singer: '',
+                            source: MusicSource.kw,
+                            meta: MusicInfoMeta(songId: songId, albumName: '')));
+                        songsToMove.add(song);
+                        appListStore.removeMusicFromList(list.id, songId);
+                      }
+                      appListStore.addMusicsToList(targetId, songsToMove);
+                      Navigator.pop(ctx);
+                      _exitBatchMode();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('已移动 ${_selectedIds.length} 首歌曲')),
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

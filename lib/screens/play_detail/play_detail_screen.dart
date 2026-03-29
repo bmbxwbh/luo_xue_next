@@ -2,12 +2,15 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/player/player_service.dart';
+import '../../services/settings/setting_store.dart';
 import '../../services/music/list_store.dart';
 import '../../models/lyric_info.dart';
 import '../../utils/format_util.dart';
 import '../../utils/global.dart';
 import '../../models/enums.dart';
 import '../../models/play_music_info.dart';
+import '../../core/search/music.dart';
+import '../../store/search_store.dart';
 
 /// 播放详情页 — 全新设计
 class PlayDetailScreen extends StatefulWidget {
@@ -194,6 +197,11 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                 ),
               ],
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.swap_horiz),
+            tooltip: '换源',
+            onPressed: () => _showSourceSwitcher(player, info),
           ),
           IconButton(
             icon: const Icon(Icons.more_horiz),
@@ -536,7 +544,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
             ],
           ),
           const SizedBox(height: 8),
-          // 底部操作栏（播放模式/收藏/下载）
+          // 底部操作栏（播放模式/倍速/收藏/下载）
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -556,6 +564,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                 ),
                 onPressed: () => _addToFavorite(),
               ),
+              _buildSpeedBtn(context),
               IconButton(
                 icon: Icon(
                   Icons.download_rounded,
@@ -732,6 +741,229 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                 onTap: () => Navigator.pop(context),
               ),
               const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSourceSwitcher(PlayerService player, PlayMusicInfo info) {
+    final sources = MusicSource.values.where((s) => s.id != 'local').toList();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '切换音源',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              ...sources.map((src) => ListTile(
+                    leading: Icon(
+                      Icons.music_note,
+                      color: info.musicInfo.source == src
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                    title: Text(src.name),
+                    subtitle: Text(src.id.toUpperCase()),
+                    trailing: info.musicInfo.source == src
+                        ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                        : null,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _switchSource(src, info.musicInfo.name, info.musicInfo.singer);
+                    },
+                  )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _switchSource(MusicSource source, String songName, String singer) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('正在搜索 ${source.name}...'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+
+      final searchService = MusicSearchService(SearchStore());
+      final keyword = '$songName $singer';
+      final results = await searchService.search(keyword, source, 1);
+
+      if (results.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${source.name} 未找到该歌曲'),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 找到最佳匹配（优先精确匹配歌名+歌手）
+      final exactMatch = results.where((s) =>
+          s.name == songName && s.singer == singer).toList();
+      final song = exactMatch.isNotEmpty ? exactMatch.first : results.first;
+
+      await globalPlayer.playMusic(song);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已切换到 ${source.name}'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('换源失败: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildSpeedBtn(BuildContext context) {
+    final store = context.watch<SettingStore>();
+    final colorScheme = Theme.of(context).colorScheme;
+    final speedLabel = store.speed == store.speed.roundToDouble()
+        ? '${store.speed.toInt()}x'
+        : '${store.speed}x';
+
+    return InkWell(
+      onTap: () => _showSpeedPicker(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.speed, size: 20, color: colorScheme.onSurfaceVariant),
+            const SizedBox(height: 2),
+            Text(
+              speedLabel,
+              style: TextStyle(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSpeedPicker(BuildContext context) {
+    final store = context.read<SettingStore>();
+    const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '倍速播放',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.center,
+                  children: speeds.map((s) {
+                    final isSelected = store.speed == s;
+                    final label = s == s.roundToDouble() ? '${s.toInt()}x' : '${s}x';
+                    return GestureDetector(
+                      onTap: () {
+                        store.setSpeed(s);
+                        globalPlayer.setPlayRate(s);
+                        Navigator.pop(context);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primaryContainer
+                              : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(20),
+                          border: isSelected
+                              ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                              : null,
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
           ),
         ),
