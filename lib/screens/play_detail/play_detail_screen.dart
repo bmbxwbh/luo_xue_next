@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/player/player_service.dart';
@@ -76,38 +77,84 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
     }
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              colorScheme.primaryContainer.withValues(alpha: 0.4),
-              colorScheme.surfaceContainerLowest,
-              colorScheme.surface,
-            ],
-            stops: const [0.0, 0.4, 1.0],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(player, info),
-              // 主内容区（封面/歌词交叉淡入淡出）
-              Expanded(
-                child: AnimatedCrossFade(
-                  duration: const Duration(milliseconds: 400),
-                  sizeCurve: Curves.easeInOut,
-                  crossFadeState: _showLyrics
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  firstChild: _buildCover(info.musicInfo.displayImg),
-                  secondChild: _buildLyrics(player),
-                ),
+      body: Stack(
+        children: [
+          // 背景：封面模糊图片或渐变
+          _buildBackground(info.musicInfo.displayImg, colorScheme),
+          // 内容
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  colorScheme.surfaceContainerLowest.withValues(alpha: 0.8),
+                  colorScheme.surface,
+                ],
+                stops: const [0.0, 0.4, 1.0],
               ),
-              _buildControls(player),
-            ],
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  _buildAppBar(player, info),
+                  // 主内容区（封面/歌词交叉淡入淡出）
+                  Expanded(
+                    child: AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 400),
+                      sizeCurve: Curves.easeInOut,
+                      crossFadeState: _showLyrics
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                      firstChild: _buildCover(info.musicInfo.displayImg),
+                      secondChild: _buildLyrics(player),
+                    ),
+                  ),
+                  _buildControls(player),
+                ],
+              ),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBackground(String? imgUrl, ColorScheme colorScheme) {
+    if (imgUrl != null && imgUrl.isNotEmpty) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+            child: Image.network(
+              imgUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _buildGradientBackground(colorScheme),
+            ),
+          ),
+          Container(
+            color: Colors.black.withValues(alpha: 0.4),
+          ),
+        ],
+      );
+    }
+    return _buildGradientBackground(colorScheme);
+  }
+
+  Widget _buildGradientBackground(ColorScheme colorScheme) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            colorScheme.primaryContainer.withValues(alpha: 0.4),
+            colorScheme.surfaceContainerLowest,
+            colorScheme.surface,
+          ],
+          stops: const [0.0, 0.4, 1.0],
         ),
       ),
     );
@@ -318,7 +365,11 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
             itemBuilder: (context, index) {
               final line = lines[index];
               final isCurrent = index == currentLine;
-              return AnimatedContainer(
+              return GestureDetector(
+                onDoubleTap: () {
+                  globalPlayer.seekTo(Duration(milliseconds: (line.time * 1000).round()));
+                },
+                child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
                 padding: EdgeInsets.symmetric(
@@ -348,6 +399,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                     textAlign: TextAlign.center,
                   ),
                 ),
+              ),
               );
             },
           ),
@@ -484,35 +536,36 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
             ],
           ),
           const SizedBox(height: 8),
-          // 底部工具栏
+          // 底部操作栏（播放模式/收藏/下载）
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildToolBtn(
-                icon: Icons.favorite_border_rounded,
-                label: '收藏',
-                onTap: () => _addToFavorite(),
+              IconButton(
+                icon: Icon(
+                  _playModeIcon(player.playMode),
+                  size: 24,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                onPressed: () => player.togglePlayMode(),
               ),
-              _buildToolBtn(
-                icon: Icons.download_rounded,
-                label: '下载',
-                onTap: () {
+              IconButton(
+                icon: Icon(
+                  Icons.favorite_border_rounded,
+                  size: 24,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                onPressed: () => _addToFavorite(),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.download_rounded,
+                  size: 24,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('下载功能开发中'),
-                      behavior: SnackBarBehavior.floating,
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                },
-              ),
-              _buildToolBtn(
-                icon: Icons.share_rounded,
-                label: '分享',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('分享功能开发中'),
                       behavior: SnackBarBehavior.floating,
                       duration: Duration(seconds: 1),
                     ),
