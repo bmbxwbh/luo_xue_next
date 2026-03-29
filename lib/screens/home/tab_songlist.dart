@@ -373,6 +373,7 @@ class _TabSongListState extends State<TabSongList> {
                           ? Image.network(
                               playlist.img,
                               fit: BoxFit.cover,
+                              cacheWidth: 300,
                               errorBuilder: (_, __, ___) => const Center(
                                 child: Icon(Icons.music_note, size: 32),
                               ),

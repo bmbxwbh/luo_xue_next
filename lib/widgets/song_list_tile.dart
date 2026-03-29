@@ -79,6 +79,7 @@ class SongListTile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 fit: BoxFit.cover,
+                cacheWidth: 80,
                 errorBuilder: (_, __, ___) => _buildIndexBadge(context, isPlaying),
               ),
             )

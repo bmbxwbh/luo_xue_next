@@ -204,6 +204,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                               ? Image.network(
                                   imgUrl,
                                   fit: BoxFit.cover,
+                                  cacheWidth: 600,
                                   errorBuilder: (_, __, ___) => _buildPlaceholder(),
                                 )
                               : _buildPlaceholder(),

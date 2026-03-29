@@ -114,6 +114,7 @@ class _SonglistDetailScreenState extends State<SonglistDetailScreen> {
                         ? Image.network(
                             widget.playlist.img,
                             fit: BoxFit.cover,
+                            cacheWidth: 600,
                             errorBuilder: (_, __, ___) => _buildPlaceholder(context),
                           )
                         : _buildPlaceholder(context),

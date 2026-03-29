@@ -163,6 +163,7 @@ class MiniPlayer extends StatelessWidget {
                   width: 40,
                   height: 40,
                   fit: BoxFit.cover,
+                  cacheWidth: 80,
                   errorBuilder: (_, __, ___) =>
                       const Icon(Icons.music_note, size: 24),
                 ),
