@@ -197,7 +197,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: Container(
                   height: 52,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHigh.withAlpha(230),
+                    color: theme.colorScheme.surfaceContainerHigh.withAlpha(150),
                     borderRadius: BorderRadius.circular(21),
                     boxShadow: [
                       BoxShadow(

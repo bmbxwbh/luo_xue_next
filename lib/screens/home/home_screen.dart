@@ -133,8 +133,9 @@ class _HomeScreenState extends State<HomeScreen>
                   filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                   child: Container(
                     color: colorScheme.surface.withValues(alpha: 0.75),
-                mainAxisSize: MainAxisSize.min,
-                children: [
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                   // 标题行：标题 + 音源选择 + 通知
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 14, 16, 8),
@@ -226,8 +227,8 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   const SizedBox(height: 8),
                 ],
-              ),
-                ), // Container
+              ), // Column
+              ), // Container
                 ), // BackdropFilter
                 ), // ClipRect
             ),
