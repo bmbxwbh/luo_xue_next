@@ -38,6 +38,7 @@ class SettingStore extends ChangeNotifier {
   bool _isShowLyricRoma = false; // 显示歌词罗马音
   bool _isHandleAudioFocus = true; // 音频焦点
   bool _isAutoCleanPlayedList = false; // 自动清理已播放列表
+  bool _disclaimerAccepted = false; // 免责协议已同意
 
   final Completer<void> _initCompleter = Completer<void>();
   bool _initialized = false;
@@ -80,6 +81,7 @@ class SettingStore extends ChangeNotifier {
   bool get isShowLyricRoma => _isShowLyricRoma;
   bool get isHandleAudioFocus => _isHandleAudioFocus;
   bool get isAutoCleanPlayedList => _isAutoCleanPlayedList;
+  bool get disclaimerAccepted => _disclaimerAccepted;
 
   void setDefaultSource(MusicSource v) {
     _defaultSource = v;
@@ -202,6 +204,11 @@ class SettingStore extends ChangeNotifier {
     _saveAndNotify();
   }
 
+  void setDisclaimerAccepted(bool v) {
+    _disclaimerAccepted = v;
+    _saveAndNotify();
+  }
+
   void _saveAndNotify() {
     notifyListeners();
     _saveSettings();
@@ -233,6 +240,7 @@ class SettingStore extends ChangeNotifier {
     _isShowLyricRoma = prefs.getBool('isShowLyricRoma') ?? false;
     _isHandleAudioFocus = prefs.getBool('isHandleAudioFocus') ?? true;
     _isAutoCleanPlayedList = prefs.getBool('isAutoCleanPlayedList') ?? false;
+    _disclaimerAccepted = prefs.getBool('disclaimerAccepted') ?? false;
     _initialized = true;
     if (!_initCompleter.isCompleted) _initCompleter.complete();
     notifyListeners();
@@ -264,5 +272,6 @@ class SettingStore extends ChangeNotifier {
     await prefs.setBool('isShowLyricRoma', _isShowLyricRoma);
     await prefs.setBool('isHandleAudioFocus', _isHandleAudioFocus);
     await prefs.setBool('isAutoCleanPlayedList', _isAutoCleanPlayedList);
+    await prefs.setBool('disclaimerAccepted', _disclaimerAccepted);
   }
 }

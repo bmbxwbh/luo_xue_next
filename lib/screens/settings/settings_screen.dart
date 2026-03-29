@@ -10,6 +10,7 @@ import '../../services/user_api/user_api_manager.dart';
 import '../../utils/app_logger.dart';
 import '../../utils/page_transitions.dart';
 import '../developer/developer_screen.dart';
+import 'about_screen.dart';
 
 /// 设置页
 class SettingsScreen extends StatelessWidget {
@@ -52,15 +53,15 @@ class SettingsScreen extends StatelessWidget {
           _buildSection(context, '关于', [
             ListTile(
               leading: const Icon(Icons.info_outline),
-              title: const Text('洛雪NEXT'),
-              subtitle: const Text('版本 1.0.0'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.code),
-              title: const Text('开源地址'),
-              subtitle: const Text('github.com/lxmusic/luo_xue_next'),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () {},
+              title: const Text('关于洛雪NEXT'),
+              subtitle: const Text('软件介绍、免责协议、开源地址'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  SlideRightRoute(page: const AboutScreen()),
+                );
+              },
             ),
           ]),
         ],

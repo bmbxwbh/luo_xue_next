@@ -17,6 +17,7 @@ import 'utils/global.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/home/tab_search.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/settings/about_screen.dart';
 import 'widgets/mini_player.dart';
 
 void main() async {
@@ -144,6 +145,16 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // 首次启动弹出免责协议
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final store = context.read<SettingStore>();
+      AboutScreen.showDisclaimerIfNeeded(context, store);
+    });
+  }
 
   static final _pages = [
     const HomeScreen(),
