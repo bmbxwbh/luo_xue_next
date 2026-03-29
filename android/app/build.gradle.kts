@@ -32,17 +32,26 @@ android {
 
     signingConfigs {
         create("release") {
-            // CI 构建使用 debug 签名，本地可配置自己的签名
-            storeFile = file("../debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            // CI 构建回退到 debug 签名（本地可替换为正式签名）
+            val debugStore = file("../debug.keystore")
+            if (debugStore.exists()) {
+                storeFile = debugStore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // 有签名文件用 release 签名，否则回退 debug
+            val releaseConfig = signingConfigs.findByName("release")
+            signingConfig = if (releaseConfig?.storeFile?.exists() == true) {
+                releaseConfig
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
