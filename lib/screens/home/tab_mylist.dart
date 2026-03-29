@@ -29,17 +29,18 @@ class _TabMyListState extends State<TabMyList> {
     // 选中了某个歌单
     if (_selectedListId != null) {
       if (_selectedListId == 'local') {
-        return _buildLocalMusicView(localService);
+        return SafeArea(child: _buildLocalMusicView(localService));
       }
       final list = listStore.getList(_selectedListId!);
-      if (list != null) return _buildSongListView(list, listStore);
+      if (list != null) return SafeArea(child: _buildSongListView(list, listStore));
     }
 
     return _buildOverview(listStore, localService);
   }
 
   Widget _buildOverview(ListStore listStore, LocalMusicService localService) {
-    return ListView(
+    return SafeArea(
+      child: ListView(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       children: [
         // 本地音乐入口
@@ -98,6 +99,7 @@ class _TabMyListState extends State<TabMyList> {
             .map((list) => _buildListTile(list, listStore)),
         const SizedBox(height: 80),
       ],
+    ),
     );
   }
 

@@ -156,7 +156,8 @@ class _TabSearchState extends State<TabSearch> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return SafeArea(
+      child: Column(
       children: [
         // 搜索框
         _buildSearchBar(),
@@ -165,6 +166,7 @@ class _TabSearchState extends State<TabSearch> {
           child: _buildContent(),
         ),
       ],
+    ),
     );
   }
 

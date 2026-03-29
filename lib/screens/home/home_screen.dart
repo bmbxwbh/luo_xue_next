@@ -118,120 +118,120 @@ class _HomeScreenState extends State<HomeScreen>
     return SafeArea(
       child: Column(
         children: [
-          // 顶栏（可隐藏）
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
+          // 顶栏（可隐藏，上滑渐隐消失）
+          AnimatedSize(
+            duration: const Duration(milliseconds: 350),
             curve: Curves.easeOutCubic,
-            height: _headerVisible ? null : 0,
-            clipBehavior: Clip.antiAlias,
-            decoration: const BoxDecoration(),
-            child: AnimatedOpacity(
-              opacity: _headerVisible ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 250),
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                  child: Container(
-                    color: colorScheme.surface.withValues(alpha: 0.75),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                  // 标题行：标题 + 音源选择 + 通知
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 16, 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          '洛雪NEXT',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const Spacer(),
-                        // 音源选择按钮
-                        InkWell(
-                          onTap: _showSourceSelector,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.source_rounded, size: 16, color: colorScheme.onPrimaryContainer),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _source.name,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: colorScheme.onPrimaryContainer,
+            child: _headerVisible
+                ? AnimatedOpacity(
+                    opacity: 1.0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Container(
+                          color: colorScheme.surface.withValues(alpha: 0.75),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // 标题行
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 14, 16, 8),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      '洛雪NEXT',
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                    ),
+                                    const Spacer(),
+                                    // 音源选择按钮
+                                    InkWell(
+                                      onTap: _showSourceSelector,
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.primaryContainer,
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.source_rounded, size: 16, color: colorScheme.onPrimaryContainer),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _source.name,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                                color: colorScheme.onPrimaryContainer,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            Icon(Icons.arrow_drop_down, size: 18, color: colorScheme.onPrimaryContainer),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: IconButton(
+                                        icon: const Icon(Icons.notifications_none_rounded, size: 22),
+                                        onPressed: () {},
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Tab栏
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Container(
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: TabBar(
+                                    controller: _tabController,
+                                    isScrollable: false,
+                                    dividerHeight: 0,
+                                    indicator: BoxDecoration(
+                                      color: colorScheme.primary,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    indicatorSize: TabBarIndicatorSize.tab,
+                                    labelColor: colorScheme.onPrimary,
+                                    unselectedLabelColor: colorScheme.onSurfaceVariant,
+                                    labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                    unselectedLabelStyle: const TextStyle(fontSize: 14),
+                                    padding: const EdgeInsets.all(3),
+                                    tabs: _tabs
+                                        .map((t) => Tab(
+                                              icon: Icon(t.icon, size: 18),
+                                              text: t.label,
+                                              height: 36,
+                                            ))
+                                        .toList(),
                                   ),
                                 ),
-                                const SizedBox(width: 2),
-                                Icon(Icons.arrow_drop_down, size: 18, color: colorScheme.onPrimaryContainer),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.notifications_none_rounded, size: 22),
-                            onPressed: () {},
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Tab栏
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        isScrollable: false,
-                        dividerHeight: 0,
-                        indicator: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        labelColor: colorScheme.onPrimary,
-                        unselectedLabelColor: colorScheme.onSurfaceVariant,
-                        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                        unselectedLabelStyle: const TextStyle(fontSize: 14),
-                        padding: const EdgeInsets.all(3),
-                        tabs: _tabs
-                            .map((t) => Tab(
-                                  icon: Icon(t.icon, size: 18),
-                                  text: t.label,
-                                  height: 36,
-                                ))
-                            .toList(),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ), // Column
-              ), // Container
-                ), // BackdropFilter
-                ), // ClipRect
-            ),
+                  )
+                : const SizedBox.shrink(),
           ),
           // Tab内容
           Expanded(
