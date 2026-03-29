@@ -14,6 +14,7 @@ import '../../utils/app_logger.dart';
 import '../../utils/page_transitions.dart';
 import '../developer/developer_screen.dart';
 import 'about_screen.dart';
+import 'equalizer_screen.dart';
 
 /// 设置页
 class SettingsScreen extends StatelessWidget {
@@ -753,15 +754,12 @@ class SettingsScreen extends StatelessWidget {
     return ListTile(
       leading: const Icon(Icons.equalizer),
       title: const Text('均衡器'),
-      subtitle: const Text('功能开发中'),
+      subtitle: const Text('调节各频段音量'),
       trailing: const Icon(Icons.chevron_right),
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('均衡器功能开发中，敬请期待'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 1),
-          ),
+        Navigator.push(
+          context,
+          SlideRightRoute(page: const EqualizerScreen()),
         );
       },
     );

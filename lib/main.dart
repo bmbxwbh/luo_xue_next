@@ -12,6 +12,7 @@ import 'store/dislike_list_store.dart';
 import 'store/search_store.dart' as store_search;
 import 'store/player_store.dart';
 import 'services/settings/setting_store.dart';
+import 'services/audio/equalizer_service.dart';
 import 'utils/app_logger.dart';
 import 'utils/global.dart';
 import 'screens/home/home_screen.dart';
@@ -51,6 +52,10 @@ void main() async {
   final settingStore = SettingStore();
   await settingStore.init();
 
+  // 初始化均衡器服务
+  final equalizerService = EqualizerService();
+  await equalizerService.init();
+
   // 初始化全局播放器
   initGlobalPlayer(
     settingStore: settingStore,
@@ -60,17 +65,20 @@ void main() async {
   runApp(LuoXueNextApp(
     userApiManager: userApiManager,
     settingStore: settingStore,
+    equalizerService: equalizerService,
   ));
 }
 
 class LuoXueNextApp extends StatelessWidget {
   final UserApiManager userApiManager;
   final SettingStore settingStore;
+  final EqualizerService equalizerService;
 
   const LuoXueNextApp({
     super.key, 
     required this.userApiManager,
     required this.settingStore,
+    required this.equalizerService,
   });
 
   @override
@@ -86,6 +94,7 @@ class LuoXueNextApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: settingStore),
         ChangeNotifierProvider(create: (_) => DislikeListStore()..init()),
         ChangeNotifierProvider.value(value: userApiManager),
+        ChangeNotifierProvider.value(value: equalizerService),
       ],
       child: Consumer<SettingStore>(
         builder: (_, settings, __) => DynamicColorBuilder(
