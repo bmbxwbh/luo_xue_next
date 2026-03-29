@@ -18,7 +18,7 @@ import 'screens/home/home_screen.dart';
 import 'screens/home/tab_search.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/settings/about_screen.dart';
-import 'widgets/mini_player.dart';
+import 'widgets/unified_bottom_bar.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -170,116 +170,30 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       body: Stack(
         children: [
           // 主页面内容（占满全屏）
-          Column(
-            children: [
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-                  child: KeyedSubtree(
-                    key: ValueKey(_index),
-                    child: _pages[_index],
-                  ),
-                ),
-              ),
-              // 音乐栏放在原来底栏的位置（底部固定）
-              const MiniPlayer(),
-            ],
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            child: KeyedSubtree(
+              key: ValueKey(_index),
+              child: _pages[_index],
+            ),
           ),
-          // 悬浮底栏（在 MiniPlayer 上方）
+          // 统一毛玻璃底栏（集成导航 + 迷你播放器 + 进度条）
           Positioned(
-            left: 16,
-            right: 16,
-            bottom: 56 + MediaQuery.of(context).padding.bottom + 10,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHigh.withAlpha(150),
-                    borderRadius: BorderRadius.circular(21),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(26),
-                        blurRadius: 12,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: List.generate(4, (i) {
-                      final icons = [
-                        Icons.home_outlined,
-                        Icons.search_outlined,
-                        Icons.library_music_outlined,
-                        Icons.settings_outlined,
-                      ];
-                      final selectedIcons = [
-                        Icons.home,
-                        Icons.search,
-                        Icons.library_music,
-                        Icons.settings,
-                      ];
-                      final labels = ['首页', '搜索', '我的', '设置'];
-                      final selected = _index == i;
-                      return Expanded(
-                        child: GestureDetector(
-                          onTap: () => _onTap(i),
-                          behavior: HitTestBehavior.opaque,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                curve: Curves.easeOutCubic,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: selected ? 12 : 0,
-                                  vertical: selected ? 2 : 0,
-                                ),
-                                decoration: selected
-                                    ? BoxDecoration(
-                                        color: theme.colorScheme.primaryContainer,
-                                        borderRadius: BorderRadius.circular(12),
-                                      )
-                                    : null,
-                                child: Icon(
-                                  selected ? selectedIcons[i] : icons[i],
-                                  size: 20,
-                                  color: selected
-                                      ? theme.colorScheme.onPrimaryContainer
-                                      : theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                labels[i],
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: selected
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ),
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: UnifiedBottomBar(
+              currentIndex: _index,
+              onTap: _onTap,
             ),
           ),
         ],
