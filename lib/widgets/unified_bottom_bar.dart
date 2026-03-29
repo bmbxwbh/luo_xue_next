@@ -7,7 +7,7 @@ import '../screens/play_detail/play_detail_screen.dart';
 import '../utils/global.dart';
 import '../utils/page_transitions.dart';
 
-/// 统一毛玻璃底栏 — 集成导航 + 迷你播放器 + 进度条
+/// 统一毛玻璃悬浮底栏 — 集成导航 + 迷你播放器 + 进度条
 class UnifiedBottomBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -34,29 +34,34 @@ class UnifiedBottomBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 进度条（有歌曲时显示，与底栏融合）
+          // 进度条
           if (hasPlayer) _buildProgress(store, context),
-          // 主底栏
+          // 悬浮底栏
           Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHigh.withAlpha(150),
-                    border: Border(
-                      top: BorderSide(
-                        color: theme.colorScheme.outlineVariant.withAlpha(40),
-                        width: 0.5,
-                      ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHigh.withAlpha(150),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(30),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: bottomPad),
-                    child: hasPlayer
-                        ? _buildWithPlayer(store, playMusicInfo, theme, context)
-                        : _buildNavOnly(theme),
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: bottomPad),
+                      child: hasPlayer
+                          ? _buildWithPlayer(store, playMusicInfo, theme, context)
+                          : _buildNavOnly(theme),
+                    ),
                   ),
                 ),
               ),
@@ -67,7 +72,7 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 进度条 — 融合在底栏顶部
+  /// 进度条
   Widget _buildProgress(PlayerStore store, BuildContext context) {
     final progress = store.progress.progress.clamp(0.0, 1.0);
     return GestureDetector(
@@ -82,14 +87,16 @@ class UnifiedBottomBar extends StatelessWidget {
       child: Container(
         height: 20,
         alignment: Alignment.bottomCenter,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Stack(
           children: [
-            // 背景
             Container(
               height: 3,
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(80),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(80),
+                borderRadius: BorderRadius.circular(1.5),
+              ),
             ),
-            // 进度
             FractionallySizedBox(
               widthFactor: progress,
               child: Container(
@@ -111,100 +118,83 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 有播放器时的布局：导航在两侧，封面+控制居中
+  /// 有播放器：导航两侧，封面+控制居中
   Widget _buildWithPlayer(PlayerStore store, playMusicInfo, ThemeData theme, BuildContext context) {
     final info = playMusicInfo.musicInfo;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context, rootNavigator: true).push(
-          SlideUpRoute(page: const PlayDetailScreen()),
-        );
-      },
-      child: Row(
-        children: [
-          // 左侧导航
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildSingleNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
-                _buildSingleNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
-              ],
-            ),
-          ),
-          // 中间：上一首 + 封面（叠播放/暂停）+ 下一首
-          Row(
-            mainAxisSize: MainAxisSize.min,
+    return Row(
+      children: [
+        // 左侧导航
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // 上一首
-              IconButton(
-                icon: Icon(
-                  Icons.skip_previous_rounded,
-                  size: 22,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                onPressed: () => globalPlayer.playPrevious(),
-                splashRadius: 18,
-              ),
-              const SizedBox(width: 2),
-              // 封面 + 播放/暂停叠在上面
-              GestureDetector(
-                onTap: () => globalPlayer.togglePlay(),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    _buildCover(info.displayImg, size: 44),
-                    // 半透明遮罩 + 播放图标
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.black.withAlpha(store.isPlay ? 0 : 60),
-                      ),
-                      child: AnimatedOpacity(
-                        opacity: store.isPlay ? 0.0 : 1.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          Icons.play_arrow_rounded,
-                          size: 26,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 2),
-              // 下一首
-              IconButton(
-                icon: Icon(
-                  Icons.skip_next_rounded,
-                  size: 22,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                onPressed: () => globalPlayer.playNext(),
-                splashRadius: 18,
-              ),
+              _buildSingleNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
+              _buildSingleNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
             ],
           ),
-          // 右侧导航
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildSingleNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
-                _buildSingleNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
-              ],
+        ),
+        // 中间：上一首 + 封面 + 下一首
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(Icons.skip_previous_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
+              onPressed: () => globalPlayer.playPrevious(),
+              splashRadius: 18,
             ),
+            const SizedBox(width: 2),
+            // 封面：单击播放/暂停，长按进详情
+            GestureDetector(
+              onTap: () => globalPlayer.togglePlay(),
+              onLongPress: () {
+                Navigator.of(context, rootNavigator: true).push(
+                  SlideUpRoute(page: const PlayDetailScreen()),
+                );
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  _buildCover(info.displayImg, size: 44),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.black.withAlpha(store.isPlay ? 0 : 60),
+                    ),
+                    child: AnimatedOpacity(
+                      opacity: store.isPlay ? 0.0 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Icon(Icons.play_arrow_rounded, size: 26, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 2),
+            IconButton(
+              icon: Icon(Icons.skip_next_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
+              onPressed: () => globalPlayer.playNext(),
+              splashRadius: 18,
+            ),
+          ],
+        ),
+        // 右侧导航
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildSingleNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
+              _buildSingleNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  /// 无播放器时的布局：导航居中
+  /// 无播放器：导航居中
   Widget _buildNavOnly(ThemeData theme) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
