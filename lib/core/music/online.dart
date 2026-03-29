@@ -42,11 +42,16 @@ class OnlineMusicService {
       // 用户API音源启用时，全局覆盖URL获取 — 对齐 apis(source) 返回 userApi
       if (_userApiManager != null && _userApiManager!.isInitialized) {
         try {
-          return await _userApiManager!.getMusicUrl(
+          final url = await _userApiManager!.getMusicUrl(
             source: source,
             musicInfo: musicInfo.toMusicInfoJson(),
             quality: quality.value,
           );
+          if (url != null && url.isNotEmpty) {
+            debugPrint('[OnlineMusic] 播放URL来自用户API ✅ source=$source');
+            return url;
+          }
+          debugPrint('[OnlineMusic] 用户API URL为空，回退内置源');
         } catch (e) {
           // 用户API获取失败，回退到内置源
           debugPrint('[OnlineMusic] 用户API获取URL失败: $e');
@@ -262,8 +267,14 @@ class OnlineMusicService {
             source: musicInfo.source.id,
             musicInfo: musicInfo.toMusicInfoJson(),
           );
-          if (url.isNotEmpty) return url;
-        } catch (_) {}
+          if (url.isNotEmpty) {
+            debugPrint('[OnlineMusic] 封面来自用户API ✅ source=${musicInfo.source.id}');
+            return url;
+          }
+          debugPrint('[OnlineMusic] 用户API封面为空，回退MusicSdk');
+        } catch (e) {
+          debugPrint('[OnlineMusic] 用户API获取封面失败: $e，回退MusicSdk');
+        }
       }
 
       // 使用 MusicSdk 获取封面 — 对齐 musicSdk[source].getPic()
@@ -293,12 +304,16 @@ class OnlineMusicService {
             musicInfo: musicInfo.toMusicInfoJson(),
           );
           if (lyricData.isNotEmpty && (lyricData['lyric'] ?? '').toString().isNotEmpty) {
+            debugPrint('[OnlineMusic] 歌词来自用户API ✅ source=${musicInfo.source.id}');
             return LyricInfo(
               lyric: lyricData['lyric'] ?? '',
               tlyric: lyricData['tlyric'],
             );
           }
-        } catch (_) {}
+          debugPrint('[OnlineMusic] 用户API歌词为空，回退MusicSdk');
+        } catch (e) {
+          debugPrint('[OnlineMusic] 用户API获取歌词失败: $e，回退MusicSdk');
+        }
       }
 
       // 使用 MusicSdk 获取歌词 — 对齐 musicSdk[source].getLyric()
