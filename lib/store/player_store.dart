@@ -69,7 +69,7 @@ class MusicInfo {
   final String? lrc;
   final String? tlrc;
   final String? rlyrc;
-  final String? lxlrc;
+  final String? lxlyric;
   final String? rawlrc;
   final String name;
   final String singer;
@@ -81,7 +81,7 @@ class MusicInfo {
     this.lrc,
     this.tlrc,
     this.rlyrc,
-    this.lxlrc,
+    this.lxlyric,
     this.rawlrc,
     this.name = '',
     this.singer = '',
@@ -94,7 +94,7 @@ class MusicInfo {
     String? lrc,
     String? tlrc,
     String? rlyrc,
-    String? lxlrc,
+    String? lxlyric,
     String? rawlrc,
     String? name,
     String? singer,
@@ -106,7 +106,7 @@ class MusicInfo {
       lrc: lrc ?? this.lrc,
       tlrc: tlrc ?? this.tlrc,
       rlyrc: rlyrc ?? this.rlyrc,
-      lxlrc: lxlrc ?? this.lxlrc,
+      lxlyric: lxlyric ?? this.lxlyric,
       rawlrc: rawlrc ?? this.rawlrc,
       name: name ?? this.name,
       singer: singer ?? this.singer,
@@ -193,7 +193,7 @@ class PlayerStore extends ChangeNotifier {
     String? lrc,
     String? tlrc,
     String? rlyrc,
-    String? lxlrc,
+    String? lxlyric,
     String? rawlrc,
     String? name,
     String? singer,
@@ -205,7 +205,7 @@ class PlayerStore extends ChangeNotifier {
       lrc: lrc,
       tlrc: tlrc,
       rlyrc: rlyrc,
-      lxlrc: lxlrc,
+      lxlyric: lxlyric,
       rawlrc: rawlrc,
       name: name,
       singer: singer,

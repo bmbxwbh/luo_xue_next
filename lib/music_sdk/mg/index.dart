@@ -30,7 +30,7 @@ class MgSdk {
       'lyric': lyricInfo.lyric,
       'tlyric': lyricInfo.tlyric,
       'rlyric': '',
-      'lxlrc': '',
+      'lxlyric': '',
     };
   }
 

@@ -31,7 +31,7 @@ class TxSdk {
       'lyric': lyricInfo.lyric,
       'tlyric': lyricInfo.tlyric,
       'rlyric': '',
-      'lxlrc': '',
+      'lxlyric': '',
     };
   }
 

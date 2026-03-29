@@ -49,7 +49,7 @@ class MgLyric {
     return LyricInfo(
       lyric: lyric,
       tlyric: tlyric.isNotEmpty ? tlyric : null,
-      lxlrc: lxlyric.isNotEmpty ? lxlyric : null,
+      lxlyric: lxlyric.isNotEmpty ? lxlyric : null,
     );
   }
 

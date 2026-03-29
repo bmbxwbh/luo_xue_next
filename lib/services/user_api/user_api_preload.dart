@@ -190,15 +190,16 @@ globalThis.lx = {
       var sourceInfo = { sources: {} };
       try {
         var allSources = ['kw','kg','tx','wy','mg','local'];
-        var supportQualitys = { kw:['128k','320k','flac','flac24bit'], kg:['128k','320k','flac','flac24bit'], tx:['128k','320k','flac','flac24bit'], wy:['128k','320k','flac','flac24bit'], mg:['128k','320k','flac','flac24bit'], local:[] };
-        var supportActions = { kw:['musicUrl'], kg:['musicUrl'], tx:['musicUrl'], wy:['musicUrl'], mg:['musicUrl'], local:['musicUrl','lyric','pic'] };
+        var sourceNames = { kw: '酷我音乐', kg: '酷狗音乐', tx: 'QQ音乐', wy: '网易音乐', mg: '咪咕音乐', local: '本地音乐' };
+        var supportQualitys = { kw: ['128k','320k','flac','flac24bit'], kg: ['128k','320k','flac','flac24bit'], tx: ['128k','320k','flac','flac24bit'], wy: ['128k','320k','flac','flac24bit'], mg: ['128k','320k','flac','flac24bit'], local: [] };
+        var supportActions = { kw: ['musicUrl'], kg: ['musicUrl'], tx: ['musicUrl'], wy: ['musicUrl'], mg: ['musicUrl'], local: ['musicUrl','lyric','pic'] };
         for (var i=0;i<allSources.length;i++) {
           var source=allSources[i], userSource=data&&data.sources?data.sources[source]:null;
           if (!userSource||userSource.type!=='music') continue;
           // 兼容两种格式：ikun.js 有 actions，Huibq 等只有 qualitys
           var userActions = userSource.actions || supportActions[source];
           var userQualitys = userSource.qualitys || supportQualitys[source];
-          sourceInfo.sources[source] = { type:'music', actions:supportActions[source].filter(function(a){return userActions.indexOf(a)>=0;}), qualitys:supportQualitys[source].filter(function(q){return userQualitys.indexOf(q)>=0;}) };
+          sourceInfo.sources[source] = { name: sourceNames[source], type: 'music', actions: supportActions[source].filter(function(a){return userActions.indexOf(a)>=0;}), qualitys: supportQualitys[source].filter(function(q){return userQualitys.indexOf(q)>=0;}) };
         }
       } catch(e) { __pushEvent__('init', {info:null,status:false,errorMessage:e.message}); return Promise.resolve(); }
       __pushEvent__('init', {info:sourceInfo,status:true});
@@ -344,6 +345,34 @@ globalThis.lx_setup = function(key, id, name, description, version, author, home
     var cb = __timeoutCallbacks__[id];
     if (cb) { delete __timeoutCallbacks__[id]; cb(); }
   };
+
+  // 冻结内置对象的 prototype 属性（除白名单外）
+  var __lx_builtinProtos__ = [
+    Array.prototype, Object.prototype, String.prototype, Number.prototype,
+    Boolean.prototype, Promise.prototype, JSON, Math, Date.prototype,
+    RegExp.prototype, Error.prototype, Map.prototype, Set.prototype,
+    Symbol.prototype, Proxy.prototype, Reflect, Function.prototype
+  ];
+  var __lx_whitelist__ = {
+    'Function.prototype.toString': true,
+    'Function.prototype.toLocaleString': true,
+    'Object.prototype.toString': true
+  };
+  for (var __lx_bi__ = 0; __lx_bi__ < __lx_builtinProtos__.length; __lx_bi__++) {
+    var __lx_proto__ = __lx_builtinProtos__[__lx_bi__];
+    if (!__lx_proto__) continue;
+    var __lx_keys__ = Object.getOwnPropertyNames(__lx_proto__);
+    for (var __lx_ki__ = 0; __lx_ki__ < __lx_keys__.length; __lx_ki__++) {
+      var __lx_key__ = __lx_keys__[__lx_ki__];
+      var __lx_val__ = __lx_proto__[__lx_key__];
+      if (typeof __lx_val__ !== 'function') continue;
+      var __lx_wlKey__ = '';
+      if (__lx_proto__ === Function.prototype) __lx_wlKey__ = 'Function.prototype.' + __lx_key__;
+      else if (__lx_proto__ === Object.prototype) __lx_wlKey__ = 'Object.prototype.' + __lx_key__;
+      if (__lx_whitelist__[__lx_wlKey__]) continue;
+      try { Object.freeze(__lx_val__); } catch(e) {}
+    }
+  }
 
   Object.freeze(globalThis.lx);
   console.log('lx_setup done: ' + name);

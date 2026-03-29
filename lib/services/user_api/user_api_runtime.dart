@@ -294,13 +294,13 @@ class UserApiRuntime {
   }
 
   Future<Map<String, dynamic>> getLyric({required String source, required Map<String, dynamic> musicInfo}) async {
-    final r = await _callHandler(source, 'lyric', {'type': 'music', 'musicInfo': musicInfo});
+    final r = await _callHandler(source, 'lyric', {'musicInfo': musicInfo});
     if (r['status'] == true) return r['result']['data'] as Map<String, dynamic>;
     return {};
   }
 
   Future<String> getPic({required String source, required Map<String, dynamic> musicInfo}) async {
-    final r = await _callHandler(source, 'pic', {'type': 'music', 'musicInfo': musicInfo});
+    final r = await _callHandler(source, 'pic', {'musicInfo': musicInfo});
     if (r['status'] == true) return r['result']['data'] as String;
     return '';
   }

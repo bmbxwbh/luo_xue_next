@@ -66,7 +66,7 @@ class WyLyric {
       lyric: lyric,
       tlyric: tlyric.isNotEmpty ? tlyric : null,
       rlyric: rlyric.isNotEmpty ? rlyric : null,
-      lxlrc: lxlyric.isNotEmpty ? lxlyric : null,
+      lxlyric: lxlyric.isNotEmpty ? lxlyric : null,
     );
   }
 

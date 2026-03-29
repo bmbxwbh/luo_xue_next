@@ -19,7 +19,7 @@ class PlayInfoManager {
     String? lrc,
     String? tlrc,
     String? rlyrc,
-    String? lxlrc,
+    String? lxlyric,
     String? rawlrc,
   }) {
     _playerStore.patchMusicInfo(
@@ -31,7 +31,7 @@ class PlayInfoManager {
       lrc: lrc,
       tlrc: tlrc,
       rlyrc: rlyrc,
-      lxlrc: lxlrc,
+      lxlyric: lxlyric,
       rawlrc: rawlrc,
     );
   }

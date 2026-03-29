@@ -178,7 +178,7 @@ class Player {
         _playerStore.patchMusicInfo(
           lrc: lyricInfo.lyric,
           tlrc: lyricInfo.tlyric,
-          lxlrc: lyricInfo.lxlrc,
+          lxlyric: lyricInfo.lxlyric,
           rlyrc: lyricInfo.rlyric,
         );
       }

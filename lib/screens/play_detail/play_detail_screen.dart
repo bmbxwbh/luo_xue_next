@@ -265,7 +265,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
       lyric: musicInfo.lrc ?? '',
       tlyric: musicInfo.tlrc,
       rlyric: musicInfo.rlyrc,
-      lxlrc: musicInfo.lxlrc,
+      lxlyric: musicInfo.lxlyric,
     );
     final lines = lyricInfo.parseLrc();
     final currentPos = player.position.inMilliseconds / 1000.0;

@@ -323,7 +323,7 @@ class OnlineMusicService {
           lyric: lyricData['lyric'] ?? '',
           tlyric: lyricData['tlyric'],
           rlyric: lyricData['rlyric'],
-          lxlrc: lyricData['lxlrc'],
+          lxlyric: lyricData['lxlyric'],
         );
       } catch (e) {
         print('MusicSdk getLyric error: $e');

@@ -43,13 +43,13 @@ class LyricInfo {
   final String? rlyric;
 
   /// 逐字歌词
-  final String? lxlrc;
+  final String? lxlyric;
 
   const LyricInfo({
     required this.lyric,
     this.tlyric,
     this.rlyric,
-    this.lxlrc,
+    this.lxlyric,
   });
 
   /// 解析 LRC 歌词为 LyricLine 列表
@@ -72,8 +72,8 @@ class LyricInfo {
 
   /// 解析逐字歌词
   List<LyricLine> parseLxlrc() {
-    if (lxlrc == null || lxlrc!.isEmpty) return parseLrc();
-    final parsed = _parseLrcText(lxlrc!);
+    if (lxlyric == null || lxlyric!.isEmpty) return parseLrc();
+    final parsed = _parseLrcText(lxlyric!);
     final result = <LyricLine>[];
     for (final e in parsed.entries) {
       result.add(LyricLine(time: e.key, text: e.value));
@@ -124,7 +124,7 @@ class LyricInfo {
   bool get hasRomaLyric => rlyric != null && rlyric!.isNotEmpty;
 
   /// 是否有逐字歌词
-  bool get hasLxlrc => lxlrc != null && lxlrc!.isNotEmpty;
+  bool get hasLxlrc => lxlyric != null && lxlyric!.isNotEmpty;
 
   /// 是否为空
   bool get isEmpty => lyric.isEmpty;
@@ -133,7 +133,7 @@ class LyricInfo {
         'lyric': lyric,
         if (tlyric != null) 'tlyric': tlyric,
         if (rlyric != null) 'rlyric': rlyric,
-        if (lxlrc != null) 'lxlrc': lxlrc,
+        if (lxlyric != null) 'lxlyric': lxlyric,
       };
 
   factory LyricInfo.fromJson(Map<String, dynamic> json) {
@@ -141,7 +141,7 @@ class LyricInfo {
       lyric: json['lyric'] ?? '',
       tlyric: json['tlyric'],
       rlyric: json['rlyric'],
-      lxlrc: json['lxlrc'],
+      lxlyric: json['lxlyric'],
     );
   }
 

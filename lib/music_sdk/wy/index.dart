@@ -31,7 +31,7 @@ class WySdk {
       'lyric': lyricInfo.lyric,
       'tlyric': lyricInfo.tlyric,
       'rlyric': '',
-      'lxlrc': '',
+      'lxlyric': '',
     };
   }
 
