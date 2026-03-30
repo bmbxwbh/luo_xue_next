@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../utils/app_logger.dart';
+import '../../services/log/log_upload_service.dart';
 
 /// 开发者模式 — 错误日志查看
 class DeveloperScreen extends StatefulWidget {
@@ -88,6 +89,28 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
             ),
           ),
           const Text('收集', style: TextStyle(fontSize: 12)),
+          const SizedBox(width: 8),
+          const Text('|', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(width: 8),
+          // 上传开关
+          ListenableBuilder(
+            listenable: logger,
+            builder: (_, __) => Switch(
+              value: LogUploadService().enabled,
+              onChanged: (v) async {
+                await LogUploadService().setEnabled(v);
+                setState(() {});
+              },
+            ),
+          ),
+          const Text('缓存', style: TextStyle(fontSize: 12)),
+          const SizedBox(width: 4),
+          // 手动上传按钮
+          IconButton(
+            icon: const Icon(Icons.cloud_upload_outlined, size: 20),
+            tooltip: '上传日志',
+            onPressed: _uploadLogs,
+          ),
         ],
       ),
     );
@@ -228,6 +251,33 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('已复制 ${logger.logs.length} 条日志')),
     );
+  }
+
+  void _uploadLogs() async {
+    final upload = LogUploadService();
+    if (!upload.enabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先开启「缓存」开关')),
+      );
+      return;
+    }
+    if (upload.bufferedCount == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('没有待上传的日志')),
+      );
+      return;
+    }
+    final count = upload.bufferedCount;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('正在上传 $count 条日志...')),
+    );
+    final ok = await upload.uploadNow();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? '✅ 上传成功 $count 条' : '❌ 上传失败')),
+      );
+      setState(() {});
+    }
   }
 
   void _clearLogs() {

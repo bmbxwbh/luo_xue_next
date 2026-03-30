@@ -231,7 +231,7 @@ class UserApiRuntime {
     final body = opts['body'];
     final jsTimeout = (opts['timeout'] as int?) ?? 30000;
     final timeoutDuration = Duration(milliseconds: jsTimeout > 15000 ? jsTimeout : 15000);
-    _log('HTTP $method $url (key=$key, timeout=${timeoutDuration.inSeconds}s)');
+    _log('--- start --- $url');
 
     // 修复 #1: 创建可取消的 HTTP 客户端
     final client = http.Client();
@@ -254,7 +254,8 @@ class UserApiRuntime {
         return;
       }
 
-      _log('HTTP 响应: ${resp.statusCode} (${resp.body.length} 字节)');
+      _log('API Response: ');
+      _log(_formatApiResponse(resp));
 
       // 解析 body
       dynamic parsedBody;
@@ -380,26 +381,112 @@ class UserApiRuntime {
   // ==================== 公开 API ====================
 
   Future<String> getMusicUrl({required String source, required Map<String, dynamic> musicInfo, required String quality}) async {
+    // 对齐洛雪原版日志格式
+    _log('Handle Action(musicUrl)');
+    _log('source');
+    _log(source);
+    _log('quality');
+    _log(quality);
+    _log('musicInfo');
+    _log(_formatMusicInfo(musicInfo));
+
     final r = await _callHandler(source, 'musicUrl', {'type': quality, 'musicInfo': musicInfo});
-    if (r['status'] == true) return r['result']['data']['url'] as String;
+    if (r['status'] == true) {
+      final url = r['result']['data']['url'] as String;
+      _log('handleGetMusicUrl(${source}_${musicInfo['songmid'] ?? '?'}, $quality) success, URL: $url');
+      return url;
+    }
+    _log('handleGetMusicUrl(${source}_${musicInfo['songmid'] ?? '?'}, $quality) failed: ${r['errorMessage']}');
     throw Exception(r['errorMessage'] ?? '失败');
   }
 
   Future<Map<String, dynamic>> getLyric({required String source, required Map<String, dynamic> musicInfo}) async {
+    _log('Handle Action(lyric)');
+    _log('source');
+    _log(source);
+    _log('musicInfo');
+    _log(_formatMusicInfo(musicInfo));
+
     final r = await _callHandler(source, 'lyric', {'musicInfo': musicInfo});
     if (r['status'] == true) return r['result']['data'] as Map<String, dynamic>;
     return {};
   }
 
   Future<String> getPic({required String source, required Map<String, dynamic> musicInfo}) async {
+    _log('Handle Action(pic)');
+    _log('source');
+    _log(source);
+    _log('musicInfo');
+    _log(_formatMusicInfo(musicInfo));
+
     final r = await _callHandler(source, 'pic', {'musicInfo': musicInfo});
     if (r['status'] == true) return r['result']['data'] as String;
     return '';
   }
 
+  /// 格式化 musicInfo 为洛雪原版日志风格（JS 对象字面量，非 JSON）
+  String _formatMusicInfo(Map<String, dynamic> info) {
+    final buf = StringBuffer('{ ');
+    bool first = true;
+    for (final entry in info.entries) {
+      if (!first) buf.write(', ');
+      buf.write('${entry.key}: ');
+      buf.write(_formatValue(entry.value));
+      first = false;
+    }
+    buf.write(' }');
+    return buf.toString();
+  }
+
+  /// 格式化 HTTP 响应为洛雪原版日志风格
+  String _formatApiResponse(http.Response resp) {
+    final buf = StringBuffer('{ statusCode: ${resp.statusCode}, statusMessage: \'${resp.reasonPhrase ?? ''}\', headers: { ');
+    bool first = true;
+    resp.headers.forEach((k, v) {
+      if (!first) buf.write(', ');
+      buf.write("$k: '$v'");
+      first = false;
+    });
+    buf.write(' }, body: ');
+    // 尝试 JSON 解析并格式化
+    try {
+      final parsed = jsonDecode(resp.body);
+      buf.write(_formatValue(parsed));
+    } catch (_) {
+      buf.write("'${resp.body.length > 200 ? '${resp.body.substring(0, 200)}...' : resp.body}'");
+    }
+    buf.write(' }');
+    return buf.toString();
+  }
+
+  /// 格式化值为洛雪原版日志风格
+  String _formatValue(dynamic v) {
+    if (v == null) return 'null';
+    if (v is bool) return v ? 'true' : 'false';
+    if (v is num) return v.toString();
+    if (v is String) return "'${v.replaceAll("'", "\\'")}'";
+    if (v is List) {
+      if (v.isEmpty) return '[]';
+      final items = v.map(_formatValue).join(', ');
+      return '[$items]';
+    }
+    if (v is Map) {
+      if (v.isEmpty) return '{}';
+      final buf = StringBuffer('{ ');
+      bool first = true;
+      for (final e in v.entries) {
+        if (!first) buf.write(', ');
+        buf.write('${e.key}: ${_formatValue(e.value)}');
+        first = false;
+      }
+      buf.write(' }');
+      return buf.toString();
+    }
+    return "'${v.toString()}'";
+  }
+
   void dispose() {
     _pollTimer?.cancel();
-    // 取消所有活跃请求
     for (final req in _activeRequests.values) {
       req.aborted = true;
       req.client.close();

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import '../services/log/log_upload_service.dart';
 
 /// 日志级别
 enum LogLevel { debug, info, warn, error }
@@ -95,6 +96,9 @@ class AppLogger extends ChangeNotifier {
     }
 
     notifyListeners();
+
+    // 日志上传到远程服务器
+    LogUploadService().addLog(entry.levelStr, tag, message);
   }
 
   void debug(String tag, String msg) => log(LogLevel.debug, tag, msg);

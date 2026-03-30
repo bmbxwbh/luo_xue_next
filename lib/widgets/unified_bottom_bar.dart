@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../store/player_store.dart';
-import '../utils/format_util.dart';
 import '../screens/play_detail/play_detail_screen.dart';
 import '../utils/global.dart';
 import '../utils/page_transitions.dart';
@@ -23,23 +22,23 @@ class UnifiedBottomBar extends StatelessWidget {
     final store = context.watch<PlayerStore>();
     final playMusicInfo = store.playMusicInfo;
     final theme = Theme.of(context);
-    final bottomPad = MediaQuery.of(context).padding.bottom;
     final hasPlayer = playMusicInfo != null;
-    final barHeight = hasPlayer ? 108.0 : 64.0;
+    final barHeight = hasPlayer ? 100.0 : 56.0;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-      height: barHeight + bottomPad,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 进度条
-          if (hasPlayer) _buildProgress(store, context),
-          // 悬浮底栏
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+    return SafeArea(
+      top: false,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        height: barHeight,
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 进度条
+            if (hasPlayer) _buildProgress(store, context),
+            // 悬浮底栏
+            Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: BackdropFilter(
@@ -48,26 +47,32 @@ class UnifiedBottomBar extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerHigh.withAlpha(150),
                       borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant.withAlpha(60),
+                        width: 0.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withAlpha(30),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
+                          color: Colors.black.withAlpha(25),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withAlpha(10),
+                          blurRadius: 40,
+                          offset: const Offset(0, 12),
                         ),
                       ],
                     ),
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: bottomPad),
-                      child: hasPlayer
-                          ? _buildWithPlayer(store, playMusicInfo, theme, context)
-                          : _buildNavOnly(theme),
-                    ),
+                    child: hasPlayer
+                        ? _buildWithPlayer(store, playMusicInfo, theme, context)
+                        : _buildNavOnly(theme),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -87,7 +92,7 @@ class UnifiedBottomBar extends StatelessWidget {
       child: Container(
         height: 20,
         alignment: Alignment.bottomCenter,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
         child: Stack(
           children: [
             Container(
@@ -118,76 +123,120 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 有播放器：导航两侧，封面+控制居中
+  /// 有播放器：导航两侧滑开，封面+控制居中浮现
   Widget _buildWithPlayer(PlayerStore store, playMusicInfo, ThemeData theme, BuildContext context) {
     final info = playMusicInfo.musicInfo;
+    final isPlaying = store.isPlay;
 
-    return Row(
+    return Stack(
       children: [
-        // 左侧导航
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildSingleNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
-              _buildSingleNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
-            ],
+        // 左侧导航 — 播放时向左滑出
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOutCubic,
+          left: isPlaying ? 4 : 0,
+          right: isPlaying ? 0 : 0, // 由 Row 控制
+          top: 0,
+          bottom: 0,
+          width: isPlaying ? 60 : null,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: isPlaying ? 0.6 : 1.0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildSingleNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
+                _buildSingleNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
+              ],
+            ),
           ),
         ),
-        // 中间：上一首 + 封面 + 下一首
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(Icons.skip_previous_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
-              onPressed: () => globalPlayer.playPrevious(),
-              splashRadius: 18,
+
+        // 右侧导航 — 播放时向右滑出
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOutCubic,
+          right: isPlaying ? 4 : 0,
+          left: isPlaying ? 0 : 0,
+          top: 0,
+          bottom: 0,
+          width: isPlaying ? 60 : null,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: isPlaying ? 0.6 : 1.0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildSingleNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
+                _buildSingleNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
+              ],
             ),
-            const SizedBox(width: 2),
-            // 封面：单击播放/暂停，长按进详情
-            GestureDetector(
-              onTap: () => globalPlayer.togglePlay(),
-              onLongPress: () {
-                Navigator.of(context, rootNavigator: true).push(
-                  SlideUpRoute(page: const PlayDetailScreen()),
-                );
-              },
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  _buildCover(info.displayImg, size: 44),
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.black.withAlpha(store.isPlay ? 0 : 60),
-                    ),
-                    child: AnimatedOpacity(
-                      opacity: store.isPlay ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 200),
-                      child: const Icon(Icons.play_arrow_rounded, size: 26, color: Colors.white),
+          ),
+        ),
+
+        // 中间：音乐控件 — 播放时浮现放大
+        Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutCubic,
+            height: 56,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 上一首
+                AnimatedSlide(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutCubic,
+                  offset: isPlaying ? Offset.zero : const Offset(0.3, 0),
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 300),
+                    opacity: isPlaying ? 1.0 : 0.3,
+                    child: IconButton(
+                      icon: Icon(Icons.skip_previous_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
+                      onPressed: () => globalPlayer.playPrevious(),
+                      splashRadius: 18,
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 2),
+                // 封面：单击播放/暂停，长按进详情
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutCubic,
+                  width: isPlaying ? 48 : 44,
+                  height: isPlaying ? 48 : 44,
+                  child: GestureDetector(
+                    onTap: () => globalPlayer.togglePlay(),
+                    onLongPress: () {
+                      Navigator.of(context, rootNavigator: true).push(
+                        SlideUpRoute(page: const PlayDetailScreen()),
+                      );
+                    },
+                    child: _AnimatedCover(
+                      url: info.displayImg,
+                      isPlaying: isPlaying,
+                      size: isPlaying ? 48 : 44,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                // 下一首
+                AnimatedSlide(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutCubic,
+                  offset: isPlaying ? Offset.zero : const Offset(-0.3, 0),
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 300),
+                    opacity: isPlaying ? 1.0 : 0.3,
+                    child: IconButton(
+                      icon: Icon(Icons.skip_next_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
+                      onPressed: () => globalPlayer.playNext(),
+                      splashRadius: 18,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 2),
-            IconButton(
-              icon: Icon(Icons.skip_next_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
-              onPressed: () => globalPlayer.playNext(),
-              splashRadius: 18,
-            ),
-          ],
-        ),
-        // 右侧导航
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildSingleNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
-              _buildSingleNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
-            ],
           ),
         ),
       ],
@@ -237,9 +286,100 @@ class UnifiedBottomBar extends StatelessWidget {
       ),
     );
   }
+}
 
-  /// 封面
-  Widget _buildCover(String? url, {double size = 40}) {
+/// 带动画的封面组件 — 切歌时播放缩放+淡入动画
+class _AnimatedCover extends StatefulWidget {
+  final String? url;
+  final bool isPlaying;
+  final double size;
+
+  const _AnimatedCover({
+    required this.url,
+    required this.isPlaying,
+    required this.size,
+  });
+
+  @override
+  State<_AnimatedCover> createState() => _AnimatedCoverState();
+}
+
+class _AnimatedCoverState extends State<_AnimatedCover> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _fadeAnim;
+  String? _currentUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUrl = widget.url;
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.url != _currentUrl) {
+      _currentUrl = widget.url;
+      _controller.reset();
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnim.value,
+          child: Opacity(
+            opacity: _fadeAnim.value,
+            child: child,
+          ),
+        );
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          _buildCover(widget.url, widget.size),
+          // 暂停图标
+          Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(widget.size * 0.25),
+              color: Colors.black.withAlpha(widget.isPlaying ? 0 : 60),
+            ),
+            child: AnimatedOpacity(
+              opacity: widget.isPlaying ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(Icons.play_arrow_rounded, size: widget.size * 0.55, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCover(String? url, double size) {
     return Hero(
       tag: url != null && url.isNotEmpty ? 'mini_cover_$url' : 'mini_cover_empty',
       child: Container(
@@ -259,10 +399,10 @@ class UnifiedBottomBar extends StatelessWidget {
                   fit: BoxFit.cover,
                   cacheWidth: (size * 2).round(),
                   errorBuilder: (_, __, ___) =>
-                      const Icon(Icons.music_note, size: 22),
+                      Icon(Icons.music_note, size: size * 0.5),
                 ),
               )
-            : const Icon(Icons.music_note, size: 22),
+            : Icon(Icons.music_note, size: size * 0.5),
       ),
     );
   }

@@ -13,6 +13,7 @@ import 'store/search_store.dart' as store_search;
 import 'store/player_store.dart';
 import 'services/settings/setting_store.dart';
 import 'services/audio/equalizer_service.dart';
+import 'services/log/log_upload_service.dart';
 import 'utils/app_logger.dart';
 import 'utils/global.dart';
 import 'screens/home/home_screen.dart';
@@ -55,6 +56,9 @@ void main() async {
   // 初始化均衡器服务
   final equalizerService = EqualizerService();
   await equalizerService.init();
+
+  // 初始化日志上传服务
+  await LogUploadService().init();
 
   // 初始化全局播放器
   initGlobalPlayer(
