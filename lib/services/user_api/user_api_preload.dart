@@ -252,6 +252,76 @@ function handleNativeResponse(data) {
   }
 }
 
+// ===================== 沙箱加固（对齐洛雪原版 lx-music-preload.js） =====================
+// 混淆代码可能检测 eval/Function 是否可用，走不同分支
+// 如果 eval/Function 可用，混淆代码可能用动态代码执行来计算 sign，导致结果不同
+
+// 1. Function.prototype.toString 劫持 — 返回 [native code] 格式
+var __origToString__ = Function.prototype.toString;
+Function.prototype.toString = function() {
+  var desc = Object.getOwnPropertyDescriptor(this, 'name');
+  if (desc && !desc.configurable) return __origToString__.apply(this);
+  return 'function ' + (this.name || '') + '() { [native code] }';
+};
+
+// 2. 禁用 eval
+globalThis.eval = function() { throw new Error('eval is not available'); };
+
+// 3. 替换 Function.prototype.constructor 为 Proxy
+var __proxyFunctionConstructor__ = (function() {
+  var target = Function.prototype.constructor;
+  return new Proxy(target, {
+    apply: function() { throw new Error('Dynamic code execution is not allowed.'); },
+    construct: function() { throw new Error('Dynamic code execution is not allowed.'); },
+  });
+})();
+Object.defineProperty(Function.prototype, 'constructor', {
+  value: __proxyFunctionConstructor__,
+  writable: false,
+  configurable: false,
+  enumerable: false,
+});
+globalThis.Function = __proxyFunctionConstructor__;
+
+// 4. 递归冻结 lx 对象
+function __freezeObject__(obj) {
+  if (typeof obj !== 'object' || obj === null) return;
+  Object.freeze(obj);
+  var keys = Object.keys(obj);
+  for (var i = 0; i < keys.length; i++) __freezeObject__(obj[keys[i]]);
+}
+__freezeObject__(globalThis.lx);
+
+// 5. 冻结 globalThis 所有属性（对齐原版 freezeObjectProperty）
+(function() {
+  var excludes = [
+    Function.prototype.toString,
+    Function.prototype.toLocaleString,
+    Object.prototype.toString,
+  ];
+  function freezeObjProp(obj, seen) {
+    if (obj == null) return;
+    var t = typeof obj;
+    if (t !== 'object' && t !== 'function') return;
+    if (seen.indexOf(obj) >= 0) return;
+    seen.push(obj);
+    var descs = Object.getOwnPropertyDescriptors(obj);
+    var names = Object.keys(descs);
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      var desc = descs[name];
+      if (excludes.indexOf(desc.value) >= 0) continue;
+      if (desc.writable) desc.writable = false;
+      if (desc.configurable) desc.configurable = false;
+      Object.defineProperty(obj, name, desc);
+      if (desc.value != null) freezeObjProp(desc.value, seen);
+    }
+  }
+  freezeObjProp(globalThis, []);
+})();
+
+console.log('沙箱加固完成 — eval/Function 已禁用，globalThis 已冻结');
+
 // ===================== lx_setup =====================
 globalThis.lx_setup = function(key, id, name, description, version, author, homepage, rawScript) {
   delete globalThis.lx_setup;
