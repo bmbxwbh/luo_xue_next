@@ -10,6 +10,8 @@ import '../../models/enums.dart';
 import '../../services/settings/setting_store.dart';
 import '../../services/player/player_service.dart';
 import '../../services/user_api/user_api_manager.dart';
+import '../../services/user_api/musicfree_manager.dart';
+import '../../utils/global.dart';
 import '../../utils/app_logger.dart';
 import '../../utils/page_transitions.dart';
 import '../developer/developer_screen.dart';
@@ -101,10 +103,61 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildUserApiConfig(BuildContext context) {
     final userApi = context.watch<UserApiManager>();
+    final mfManager = context.watch<MusicFreeManager>();
     final hasApi = userApi.isInitialized;
+    final hasMfPlugin = mfManager.currentPlugin != null;
     final list = userApi.state.list;
+    final mfPlugins = mfManager.plugins;
 
-    // 没有导入任何外部音源 → 显示导入入口
+    // 当前模式
+    final isMfMode = globalOnlineMusicService.pluginMode == 'musicfree';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 模式切换
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.settings_applications, size: 20),
+              const SizedBox(width: 12),
+              const Text('插件系统', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              const Spacer(),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('洛雪脚本')),
+                  ButtonSegment(value: true, label: Text('MF插件')),
+                ],
+                selected: {isMfMode},
+                onSelectionChanged: (selected) {
+                  final mode = selected.first ? 'musicfree' : 'lx';
+                  globalOnlineMusicService.setPluginMode(mode);
+                  // 保存到 SharedPreferences
+                  SharedPreferences.getInstance().then((prefs) {
+                    prefs.setString('plugin_mode', mode);
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+
+        // 根据模式显示不同 UI
+        if (!isMfMode) ...[
+          // 洛雪模式：显示外部音源管理
+          _buildLxApiSection(context, userApi, hasApi, list),
+        ] else ...[
+          // MF 模式：显示插件管理
+          _buildMfPluginSection(context, mfManager, hasMfPlugin, mfPlugins),
+        ],
+      ],
+    );
+  }
+
+  /// 洛雪模式 UI
+  Widget _buildLxApiSection(BuildContext context, UserApiManager userApi, bool hasApi, List list) {
     if (list.isEmpty) {
       return ListTile(
         leading: const Icon(Icons.extension),
@@ -115,7 +168,6 @@ class SettingsScreen extends StatelessWidget {
       );
     }
 
-    // 有导入的外部音源 → 显示开关 + 管理
     final activeName = hasApi
         ? (userApi.state.currentApi?.name ?? list.first.name)
         : '';
@@ -154,6 +206,127 @@ class SettingsScreen extends StatelessWidget {
           onTap: () => _showUserApiDialog(context),
         ),
       ],
+    );
+  }
+
+  /// MF 模式 UI
+  Widget _buildMfPluginSection(BuildContext context, MusicFreeManager mfManager, bool hasMfPlugin, List<MusicFreePluginInfo> plugins) {
+    if (plugins.isEmpty) {
+      return ListTile(
+        leading: const Icon(Icons.extension_outlined),
+        title: const Text('MF 插件'),
+        subtitle: const Text('导入 MusicFree 格式插件'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _showMfImportDialog(context),
+      );
+    }
+
+    return Column(
+      children: [
+        // 当前插件状态
+        ListTile(
+          leading: const Icon(Icons.extension_outlined),
+          title: const Text('MF 插件'),
+          subtitle: Text(hasMfPlugin
+              ? '已加载: ${mfManager.currentPlugin?.name}'
+              : '有 ${plugins.length} 个插件未加载'),
+        ),
+        // 插件列表
+        ...plugins.map((plugin) => ListTile(
+              dense: true,
+              leading: const SizedBox(width: 48),
+              title: Text(plugin.name, style: const TextStyle(fontSize: 14)),
+              subtitle: Text(
+                plugin.methods.join(', '),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (plugin.supportsGetMediaSource)
+                    const Icon(Icons.play_circle_outline, size: 16, color: Colors.green),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    onPressed: () async {
+                      await mfManager.removePlugin(plugin.id);
+                    },
+                  ),
+                ],
+              ),
+              onTap: () async {
+                try {
+                  await mfManager.setActivePlugin(plugin.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('✅ ${plugin.name} 已激活')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('❌ 激活失败: $e')),
+                    );
+                  }
+                }
+              },
+            )),
+        // 导入按钮
+        ListTile(
+          dense: true,
+          leading: const SizedBox(width: 48),
+          title: Text(
+            '导入 MF 插件',
+            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary),
+          ),
+          trailing: Icon(Icons.add, size: 18, color: Theme.of(context).colorScheme.primary),
+          onTap: () => _showMfImportDialog(context),
+        ),
+      ],
+    );
+  }
+
+  /// MF 插件导入对话框
+  void _showMfImportDialog(BuildContext context) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('导入 MF 插件'),
+        content: TextField(
+          controller: controller,
+          maxLines: 8,
+          decoration: const InputDecoration(
+            hintText: '粘贴 MusicFree 格式的插件 JS 代码...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final script = controller.text.trim();
+              if (script.isEmpty) return;
+
+              final mfManager = context.read<MusicFreeManager>();
+              final result = await mfManager.importPlugin(script);
+
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(result['success'] == true
+                      ? '✅ ${result['message']}'
+                      : '❌ ${result['message']}')),
+                );
+              }
+            },
+            child: const Text('导入'),
+          ),
+        ],
+      ),
     );
   }
 

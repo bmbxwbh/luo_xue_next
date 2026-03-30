@@ -7,6 +7,7 @@ import 'services/music/list_store.dart';
 import 'services/music/local_music_service.dart';
 import 'services/music/hot_search_store.dart';
 import 'services/user_api/user_api_manager.dart';
+import 'services/user_api/musicfree_manager.dart';
 import 'screens/home/tab_mylist.dart';
 import 'store/dislike_list_store.dart';
 import 'store/search_store.dart' as store_search;
@@ -49,6 +50,10 @@ void main() async {
   final userApiManager = UserApiManager();
   await userApiManager.init();
 
+  // 初始化 MusicFree 插件管理器
+  final musicFreeManager = MusicFreeManager();
+  await musicFreeManager.init();
+
   // 初始化设置存储
   final settingStore = SettingStore();
   await settingStore.init();
@@ -64,10 +69,12 @@ void main() async {
   initGlobalPlayer(
     settingStore: settingStore,
     userApiManager: userApiManager,
+    musicFreeManager: musicFreeManager,
   );
 
   runApp(LuoXueNextApp(
     userApiManager: userApiManager,
+    musicFreeManager: musicFreeManager,
     settingStore: settingStore,
     equalizerService: equalizerService,
   ));
@@ -75,12 +82,14 @@ void main() async {
 
 class LuoXueNextApp extends StatelessWidget {
   final UserApiManager userApiManager;
+  final MusicFreeManager musicFreeManager;
   final SettingStore settingStore;
   final EqualizerService equalizerService;
 
   const LuoXueNextApp({
     super.key, 
     required this.userApiManager,
+    required this.musicFreeManager,
     required this.settingStore,
     required this.equalizerService,
   });
@@ -98,6 +107,7 @@ class LuoXueNextApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: settingStore),
         ChangeNotifierProvider(create: (_) => DislikeListStore()..init()),
         ChangeNotifierProvider.value(value: userApiManager),
+        ChangeNotifierProvider.value(value: musicFreeManager),
         ChangeNotifierProvider.value(value: equalizerService),
       ],
       child: Consumer<SettingStore>(

@@ -6,6 +6,7 @@ import '../../models/lyric_info.dart';
 import '../../utils/http_client.dart';
 import '../../music_sdk/index.dart';
 import '../../services/user_api/user_api_manager.dart';
+import '../../services/user_api/musicfree_manager.dart';
 
 /// 在线音乐服务 — 对齐 LX Music core/music/online.ts
 /// 播放URL 通过 API 源获取，歌词/封面通过 MusicSdk 获取
@@ -13,8 +14,17 @@ class OnlineMusicService {
   /// API 基础地址（可配置）
   String _apiBase = 'https://lxmusicapi.onrender.com';
 
-  /// 用户 API 管理器（可选）
+  /// 用户 API 管理器（可选，洛雪模式）
   UserApiManager? _userApiManager;
+
+  /// MusicFree 插件管理器（可选，MF 模式）
+  MusicFreeManager? _mfManager;
+
+  /// 当前插件模式
+  String _pluginMode = 'lx'; // 'lx' 或 'musicfree'
+
+  /// 获取当前插件模式
+  String get pluginMode => _pluginMode;
 
   /// 设置API地址
   void setApiBase(String url) {
@@ -24,6 +34,16 @@ class OnlineMusicService {
   /// 设置用户 API 管理器
   void setUserApiManager(UserApiManager manager) {
     _userApiManager = manager;
+  }
+
+  /// 设置 MusicFree 插件管理器
+  void setMusicFreeManager(MusicFreeManager manager) {
+    _mfManager = manager;
+  }
+
+  /// 设置插件模式
+  void setPluginMode(String mode) {
+    _pluginMode = mode;
   }
 
   // ============ 播放URL获取 — 对齐 apis(source).getMusicUrl() ============
@@ -39,8 +59,38 @@ class OnlineMusicService {
       final source = musicInfo.source.id;
       final songmid = musicInfo.songmid;
 
-      // 用户API音源启用时，全局覆盖URL获取 — 对齐 apis(source) 返回 userApi
-      if (_userApiManager != null && _userApiManager!.isInitialized) {
+      // MF 模式：优先使用 MF 插件获取播放链接
+      if (_pluginMode == 'musicfree' && _mfManager != null) {
+        try {
+          // 构建 MF 格式的 musicItem
+          final mfItem = {
+            'id': songmid,
+            'platform': source,
+            'title': musicInfo.name,
+            'artist': musicInfo.singer,
+            'album': musicInfo.albumName,
+            'artwork': musicInfo.img,
+            'duration': musicInfo.intervalSec,
+          };
+          // quality 映射：128k→low, 320k→standard, flac→high, flac24bit→super
+          final mfQuality = _lxQualityToMf(quality.value);
+
+          final result = await _mfManager!.getMediaSource(
+            musicItem: mfItem,
+            quality: mfQuality,
+          );
+          if (result != null && result['url'] != null && (result['url'] as String).isNotEmpty) {
+            debugPrint('[OnlineMusic] 播放URL来自MF插件 ✅');
+            return result['url'] as String;
+          }
+          debugPrint('[OnlineMusic] MF插件URL为空，回退内置源');
+        } catch (e) {
+          debugPrint('[OnlineMusic] MF插件获取URL失败: $e');
+        }
+      }
+
+      // 洛雪模式：用户API音源（全局覆盖）
+      if (_pluginMode != 'musicfree' && _userApiManager != null && _userApiManager!.isInitialized) {
         try {
           final url = await _userApiManager!.getMusicUrl(
             source: source,
@@ -56,7 +106,7 @@ class OnlineMusicService {
           // 用户API获取失败，回退到内置源
           debugPrint('[OnlineMusic] 用户API获取URL失败: $e');
         }
-      } else {
+      } else if (_pluginMode != 'musicfree') {
         debugPrint('[OnlineMusic] 用户API未初始化: manager=${_userApiManager != null}, inited=${_userApiManager?.isInitialized}');
       }
 
@@ -333,5 +383,20 @@ class OnlineMusicService {
       print('getLyricInfo error: $e');
       return const LyricInfo(lyric: '');
     }
+  }
+
+  /// 洛雪音质 → MF 音质映射
+  String _lxQualityToMf(String lxQuality) {
+    const mapping = {
+      '128k': 'low',
+      '192k': 'low',
+      '320k': 'standard',
+      'flac': 'high',
+      'ape': 'high',
+      'wav': 'high',
+      'flac24bit': 'super',
+      'flac32bit': 'super',
+    };
+    return mapping[lxQuality] ?? 'standard';
   }
 }

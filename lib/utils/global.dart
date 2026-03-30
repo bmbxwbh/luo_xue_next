@@ -6,6 +6,7 @@ import '../core/music/online.dart';
 import '../store/player_store.dart';
 import '../services/settings/setting_store.dart';
 import '../services/user_api/user_api_manager.dart';
+import '../services/user_api/musicfree_manager.dart';
 
 /// 全局播放器
 late final Player globalPlayer;
@@ -19,10 +20,14 @@ late final SettingStore globalSettingStore;
 /// 在线音乐服务
 late final OnlineMusicService globalOnlineMusicService;
 
+/// MusicFree 插件管理器
+late final MusicFreeManager globalMusicFreeManager;
+
 /// 初始化全局播放器
 void initGlobalPlayer({
   required SettingStore settingStore,
   required UserApiManager userApiManager,
+  MusicFreeManager? musicFreeManager,
 }) {
   globalSettingStore = settingStore;
   globalPlayerStore = PlayerStore();
@@ -30,6 +35,12 @@ void initGlobalPlayer({
   
   // 连接用户 API 管理器
   globalOnlineMusicService.setUserApiManager(userApiManager);
+
+  // 连接 MusicFree 插件管理器
+  if (musicFreeManager != null) {
+    globalMusicFreeManager = musicFreeManager;
+    globalOnlineMusicService.setMusicFreeManager(musicFreeManager);
+  }
   
   globalPlayer = Player(
     playerStore: globalPlayerStore,
