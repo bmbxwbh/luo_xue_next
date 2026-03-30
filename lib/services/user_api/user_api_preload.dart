@@ -1,4 +1,4 @@
-/// 用户 API 预加载脚本 — 纯 JS 实现工具函数，无需 Dart 桥接
+/// 用户 API 预加载脚本 — 纯 JS 实现工具函数
 const String kUserApiPreloadScript = '''
 'use strict';
 
@@ -79,65 +79,7 @@ var __lx_md5__ = (function(){
   return function(s){return hash(unescape(encodeURIComponent(s)));};
 })();
 
-// === 纯 JS SHA-256 实现（RFC 6234 标准）===
-var __lx_sha256__ = (function(){
-  var K=[1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,
-    3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,
-    3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,
-    2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,
-    666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,
-    2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,
-    430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,
-    1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298];
-  function R(n,x){return(x>>>n)|(x<<(32-n));}
-  function Ch(x,y,z){return(x&y)^(~x&z);}
-  function Maj(x,y,z){return(x&y)^(x&z)^(y&z);}
-  function S0(x){return R(2,x)^R(13,x)^R(22,x);}
-  function S1(x){return R(6,x)^R(11,x)^R(25,x);}
-  function s0(x){return R(7,x)^R(18,x)^(x>>>3);}
-  function s1(x){return R(17,x)^R(19,x)^(x>>>10);}
-  function hash(bytes){
-    var bl=bytes.length*8;bytes.push(0x80);while(bytes.length%64!==56)bytes.push(0);
-    var lo=bl>>>0,hi=Math.floor(bl/4294967296)>>>0;
-    bytes.push(hi>>>24&0xff,hi>>>16&0xff,hi>>>8&0xff,hi&0xff);
-    bytes.push(lo>>>24&0xff,lo>>>16&0xff,lo>>>8&0xff,lo&0xff);
-    var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
-    var W=new Array(64);
-    for(var o=0;o<bytes.length;o+=64){
-      for(var i=0;i<16;i++){var j=o+i*4;W[i]=((bytes[j]<<24)|(bytes[j+1]<<16)|(bytes[j+2]<<8)|bytes[j+3])>>>0;}
-      for(var i=16;i<64;i++)W[i]=(s1(W[i-2])+W[i-7]+s0(W[i-15])+W[i-16])>>>0;
-      var a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
-      for(var i=0;i<64;i++){
-        var T1=(h+S1(e)+Ch(e,f,g)+K[i]+W[i])>>>0;
-        var T2=(S0(a)+Maj(a,b,c))>>>0;
-        h=g;g=f;f=e;e=(d+T1)>>>0;d=c;c=b;b=a;a=(T1+T2)>>>0;
-      }
-      H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;
-      H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0;
-    }
-    function hex(n){return(((n>>>24)&0xff).toString(16).padStart(2,'0'))+(((n>>>16)&0xff).toString(16).padStart(2,'0'))+(((n>>>8)&0xff).toString(16).padStart(2,'0'))+((n&0xff).toString(16).padStart(2,'0'));}
-    return hex(H[0])+hex(H[1])+hex(H[2])+hex(H[3])+hex(H[4])+hex(H[5])+hex(H[6])+hex(H[7]);
-  }
-  return function(s){return hash(Array.from(unescape(encodeURIComponent(s))).map(function(c){return c.charCodeAt(0);}));};
-})();
-
-// 拦截 __pushEvent__，记录 sign 用于调试
-var __origPushEvent__ = __pushEvent__;
-__pushEvent__ = function(action, data) {
-  if (action === 'request' && data && data.url) {
-    var url = data.url;
-    var signIdx = url.indexOf('sign=');
-    if (signIdx > -1) {
-      console.log('sign: ' + url.substring(signIdx + 5, signIdx + 69));
-    }
-  }
-  __origPushEvent__(action, data);
-};
-
-// 暴露为全局 sha256 函数，供用户脚本使用
-globalThis.sha256 = __lx_sha256__;
-
-// === 纯 JS AES-128-CBC/ECB 实现 ===
+// === 纯 JS AES-128-CBC/ECB 实现（PKCS7 填充）===
 var __lx_aesEncrypt__ = (function() {
   var SBOX=[0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75,0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84,0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf,0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8,0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2,0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73,0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb,0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79,0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08,0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a,0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e,0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16];
   var RCON=[0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36];
@@ -145,7 +87,7 @@ var __lx_aesEncrypt__ = (function() {
   function mul(a,b){var p=0;for(var i=0;i<8;i++){if(b&1)p^=a;a=xtime(a);b>>=1;}return p;}
   function keyExpansion(key){var nk=key.length/4,exp=[];for(var i=0;i<nk;i++)exp[i]=(key[4*i]|(key[4*i+1]<<8)|(key[4*i+2]<<16)|(key[4*i+3]<<24))>>>0;for(var j=nk;j<4*(nk+7);j++){var t=exp[j-1];if(j%nk===0)t=(SBOX[(t>>8)&0xFF]|(SBOX[(t>>16)&0xFF]<<8)|(SBOX[(t>>24)&0xFF]<<16)|(SBOX[t&0xFF]<<24))>>>0^(RCON[(j/nk)-1]||0);else if(nk>6&&j%nk===4)t=(SBOX[t&0xFF]|(SBOX[(t>>8)&0xFF]<<8)|(SBOX[(t>>16)&0xFF]<<16)|(SBOX[(t>>24)&0xFF]<<24))>>>0;exp[j]=exp[j-nk]^t;}return exp;}
   function subBytes(s){for(var i=0;i<4;i++)for(var j=0;j<4;j++)s[i][j]=SBOX[s[i][j]];}
-  function shiftRows(s){var t;s[1]=[s[1][1],s[1][2],s[1][3],s[1][0]];s[2]=[s[2][2],s[2][3],s[2][0],s[2][1]];s[3]=[s[3][3],s[3][0],s[3][1],s[3][2]];}
+  function shiftRows(s){s[1]=[s[1][1],s[1][2],s[1][3],s[1][0]];s[2]=[s[2][2],s[2][3],s[2][0],s[2][1]];s[3]=[s[3][3],s[3][0],s[3][1],s[3][2]];}
   function mixColumns(s){for(var i=0;i<4;i++){var a=s[i],b=[];for(var j=0;j<4;j++)b[j]=mul(a[j],2)^mul(a[(j+1)%4],3)^a[(j+2)%4]^a[(j+3)%4];s[i]=b;}}
   function addRoundKey(s,k,r){for(var i=0;i<4;i++)for(var j=0;j<4;j++)s[i][j]^=(k[r*4+j]>>(i*8))&0xFF;}
   function encryptBlock(block,expanded){var s=[];for(var i=0;i<4;i++){s[i]=[];for(var j=0;j<4;j++)s[i][j]=block[i*4+j];}
@@ -160,13 +102,13 @@ var __lx_aesEncrypt__ = (function() {
   };
 })();
 
-// === 在 lx_setup 之前暴露 lx 对象供用户脚本使用 ===
+// === 事件处理 ===
 var __lx_handlers__ = {};
 var __lx_inited__ = false;
 var __lx_requestQueue__ = {};
 var __lx_reqCounter__ = 0;
 
-// 捕获 console.log 输出到事件队列（方便 Dart 侧查看）
+// console.log 捕获
 var __origConsoleLog__ = console.log;
 console.log = function() {
   var msg = Array.prototype.slice.call(arguments).map(function(a) {
@@ -177,6 +119,7 @@ console.log = function() {
 };
 console.error = console.log;
 
+// ===================== lx 对象 =====================
 globalThis.lx = {
   EVENT_NAMES: { request: 'request', inited: 'inited', updateAlert: 'updateAlert' },
   on: function(eventName, handler) {
@@ -189,17 +132,16 @@ globalThis.lx = {
       __lx_inited__ = true;
       var sourceInfo = { sources: {} };
       try {
+        // 修复 #3: sourceInfo 不含 name 字段，对齐洛雪原版 handleInit
         var allSources = ['kw','kg','tx','wy','mg','local'];
-        var sourceNames = { kw: '酷我音乐', kg: '酷狗音乐', tx: 'QQ音乐', wy: '网易音乐', mg: '咪咕音乐', local: '本地音乐' };
         var supportQualitys = { kw: ['128k','320k','flac','flac24bit'], kg: ['128k','320k','flac','flac24bit'], tx: ['128k','320k','flac','flac24bit'], wy: ['128k','320k','flac','flac24bit'], mg: ['128k','320k','flac','flac24bit'], local: [] };
         var supportActions = { kw: ['musicUrl'], kg: ['musicUrl'], tx: ['musicUrl'], wy: ['musicUrl'], mg: ['musicUrl'], local: ['musicUrl','lyric','pic'] };
         for (var i=0;i<allSources.length;i++) {
           var source=allSources[i], userSource=data&&data.sources?data.sources[source]:null;
           if (!userSource||userSource.type!=='music') continue;
-          // 兼容两种格式：ikun.js 有 actions，Huibq 等只有 qualitys
           var userActions = userSource.actions || supportActions[source];
           var userQualitys = userSource.qualitys || supportQualitys[source];
-          sourceInfo.sources[source] = { name: sourceNames[source], type: 'music', actions: supportActions[source].filter(function(a){return userActions.indexOf(a)>=0;}), qualitys: supportQualitys[source].filter(function(q){return userQualitys.indexOf(q)>=0;}) };
+          sourceInfo.sources[source] = { type: 'music', actions: supportActions[source].filter(function(a){return userActions.indexOf(a)>=0;}), qualitys: supportQualitys[source].filter(function(q){return userQualitys.indexOf(q)>=0;}) };
         }
       } catch(e) { __pushEvent__('init', {info:null,status:false,errorMessage:e.message}); return Promise.resolve(); }
       __pushEvent__('init', {info:sourceInfo,status:true});
@@ -209,9 +151,22 @@ globalThis.lx = {
   request: function(url, options, callback) {
     if (typeof options==='function'){callback=options;options={};} if(!options)options={};
     var id='http_'+(++__lx_reqCounter__);
-    var requestInfo = { aborted: false, abort: function(){ this.aborted=true; } };
+
+    // 修复 #1: 真实 abort — 通过 __lx_abort_queue__ 通知 Dart 取消 HTTP 请求
+    var requestInfo = {
+      aborted: false,
+      abort: function() {
+        if (this.aborted) return;
+        this.aborted = true;
+        if (globalThis.__lx_abort_queue__) {
+          globalThis.__lx_abort_queue__.push(id);
+        }
+      }
+    };
+
     __lx_requestQueue__[id] = { callback: callback, requestInfo: requestInfo };
-    // 统一 options 格式（对齐原项目 request.js 的 handleRequestData）
+
+    // 统一 options 格式（对齐洛雪原版 request.js 的 handleRequestData）
     var method = (options.method || 'GET').toUpperCase();
     var headers = Object.assign({ 'Accept': 'application/json' }, options.headers || {});
     var body = options.body || null;
@@ -233,6 +188,7 @@ globalThis.lx = {
     if (headers['Content-Type'] === 'application/json' && body && typeof body !== 'string') {
       body = JSON.stringify(body);
     }
+
     __pushEvent__('request', { requestKey: id, url: url, options: {
       method: method, headers: headers, body: body, timeout: options.timeout || 13000
     }});
@@ -274,11 +230,12 @@ globalThis.lx = {
   env: 'mobile',
 };
 
+// ===================== 事件推送 =====================
 function __pushEvent__(action, data) {
   if (globalThis.__lx_event_queue__) globalThis.__lx_event_queue__.push({action:action, data:JSON.stringify(data)});
 }
 
-// 响应处理：对齐洛雪原版 handleNativeResponse
+// ===================== 原生响应处理（修复 #4） =====================
 function handleNativeResponse(data) {
   var targetRequest = __lx_requestQueue__[data.requestKey];
   if (!targetRequest) return;
@@ -286,7 +243,6 @@ function handleNativeResponse(data) {
   targetRequest.requestInfo.aborted = true;
   if (data.error == null) {
     var resp = data.response;
-    // body 可能已是对象（Dart 侧预解析），也可能是字符串
     if (typeof resp.body === 'string') {
       try { resp.body = JSON.parse(resp.body); } catch(e) {}
     }
@@ -296,38 +252,12 @@ function handleNativeResponse(data) {
   }
 }
 
-// 响应验证函数（对齐洛雪原版 handleRequest）
-function __verifyLyric__(info) {
-  if (typeof info !== 'object' || typeof info.lyric !== 'string') throw new Error('failed');
-  if (info.lyric.length > 51200) throw new Error('failed');
-  return {
-    lyric: info.lyric,
-    tlyric: (typeof info.tlyric === 'string' && info.tlyric.length < 5120) ? info.tlyric : null,
-    rlyric: (typeof info.rlyric === 'string' && info.rlyric.length < 5120) ? info.rlyric : null,
-    lxlyric: (typeof info.lxlyric === 'string' && info.lxlyric.length < 8192) ? info.lxlyric : null,
-  };
-}
-
-function __verifyUrl__(url) {
-  if (typeof url !== 'string' || url.length > 2048 || !/^https?:/.test(url)) throw new Error('failed');
-  return url;
-}
-
-// lx_setup: 用户脚本加载后调用
+// ===================== lx_setup =====================
 globalThis.lx_setup = function(key, id, name, description, version, author, homepage, rawScript) {
   delete globalThis.lx_setup;
   globalThis.lx.currentScriptInfo = {name:name,description:description,version:version,author:author,homepage:homepage,rawScript:rawScript};
 
-  // 自测 MD5
-  try {
-    var md5test = __lx_md5__('test');
-    console.log('MD5 test: ' + md5test + ' (expect: 098f6bcd4621d373cade4e832627b4f6)');
-    if (md5test !== '098f6bcd4621d373cade4e832627b4f6') {
-      console.log('MD5 MISMATCH!');
-    }
-  } catch(e) { console.log('MD5 error: ' + e.message); }
-
-  // setTimeout/clearTimeout 支持（对齐洛雪原版）
+  // setTimeout/clearTimeout 支持
   var __timeoutCallbacks__ = {};
   var __timeoutId__ = 0;
   globalThis.setTimeout = function(callback, timeout) {
@@ -335,46 +265,18 @@ globalThis.lx_setup = function(key, id, name, description, version, author, home
     var id = __timeoutId__++;
     __timeoutCallbacks__[id] = callback;
     var ms = parseInt(timeout) || 0;
-    // 使用 Dart 侧的定时器
     globalThis.__lx_event_queue__.push({action:'__setTimeout__', data:JSON.stringify({id:id, ms:ms})});
     return id;
   };
   globalThis.clearTimeout = function(id) { delete __timeoutCallbacks__[id]; };
-  // Dart 调用此函数触发 setTimeout 回调
   globalThis.__lx_fireTimeout__ = function(id) {
     var cb = __timeoutCallbacks__[id];
     if (cb) { delete __timeoutCallbacks__[id]; cb(); }
   };
 
-  // 冻结内置对象的 prototype 属性（除白名单外）
-  var __lx_builtinProtos__ = [
-    Array.prototype, Object.prototype, String.prototype, Number.prototype,
-    Boolean.prototype, Promise.prototype, JSON, Math, Date.prototype,
-    RegExp.prototype, Error.prototype, Map.prototype, Set.prototype,
-    Symbol.prototype, Proxy.prototype, Reflect, Function.prototype
-  ];
-  var __lx_whitelist__ = {
-    'Function.prototype.toString': true,
-    'Function.prototype.toLocaleString': true,
-    'Object.prototype.toString': true
-  };
-  for (var __lx_bi__ = 0; __lx_bi__ < __lx_builtinProtos__.length; __lx_bi__++) {
-    var __lx_proto__ = __lx_builtinProtos__[__lx_bi__];
-    if (!__lx_proto__) continue;
-    var __lx_keys__ = Object.getOwnPropertyNames(__lx_proto__);
-    for (var __lx_ki__ = 0; __lx_ki__ < __lx_keys__.length; __lx_ki__++) {
-      var __lx_key__ = __lx_keys__[__lx_ki__];
-      var __lx_val__ = __lx_proto__[__lx_key__];
-      if (typeof __lx_val__ !== 'function') continue;
-      var __lx_wlKey__ = '';
-      if (__lx_proto__ === Function.prototype) __lx_wlKey__ = 'Function.prototype.' + __lx_key__;
-      else if (__lx_proto__ === Object.prototype) __lx_wlKey__ = 'Object.prototype.' + __lx_key__;
-      if (__lx_whitelist__[__lx_wlKey__]) continue;
-      try { Object.freeze(__lx_val__); } catch(e) {}
-    }
-  }
-
+  // 冻结 lx 对象
   Object.freeze(globalThis.lx);
+
   console.log('lx_setup done: ' + name);
 };
 ''';

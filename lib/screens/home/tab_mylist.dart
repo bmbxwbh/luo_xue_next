@@ -41,16 +41,66 @@ class _TabMyListState extends State<TabMyList> {
     final listStore = context.watch<ListStore>();
     final localService = context.watch<LocalMusicService>();
 
-    // 选中了某个歌单
+    // 选中了某个子页面
     if (_selectedListId != null) {
+      Widget? child;
       if (_selectedListId == 'local') {
-        return SafeArea(child: _buildLocalMusicView(localService));
+        child = _buildLocalMusicView(localService);
+      } else {
+        final list = listStore.getList(_selectedListId!);
+        if (list != null) child = _buildSongListView(list, listStore);
       }
-      final list = listStore.getList(_selectedListId!);
-      if (list != null) return SafeArea(child: _buildSongListView(list, listStore));
+
+      if (child != null) {
+        return SafeArea(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (widget, animation) {
+              final offsetAnimation = Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              ));
+              return SlideTransition(
+                position: offsetAnimation,
+                child: widget,
+              );
+            },
+            child: KeyedSubtree(
+              key: ValueKey(_selectedListId),
+              child: child,
+            ),
+          ),
+        );
+      }
     }
 
-    return _buildOverview(listStore, localService);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (widget, animation) {
+        final offsetAnimation = Tween<Offset>(
+          begin: const Offset(-1.0, 0.0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        ));
+        return SlideTransition(
+          position: offsetAnimation,
+          child: widget,
+        );
+      },
+      child: KeyedSubtree(
+        key: const ValueKey('overview'),
+        child: _buildOverview(listStore, localService),
+      ),
+    );
   }
 
   Widget _buildOverview(ListStore listStore, LocalMusicService localService) {
