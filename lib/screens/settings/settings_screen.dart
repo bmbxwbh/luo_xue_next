@@ -65,7 +65,7 @@ class SettingsScreen extends StatelessWidget {
           _buildSection(context, '关于', [
             ListTile(
               leading: const Icon(Icons.info_outline),
-              title: const Text('关于洛雪NEXT'),
+              title: const Text('关于浮生音乐'),
               subtitle: const Text('软件介绍、免责协议、开源地址'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {

@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/player/player_service.dart';
 import '../../services/settings/setting_store.dart';
 import '../../services/music/list_store.dart';
@@ -131,10 +132,10 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
         children: [
           ImageFiltered(
             imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-            child: Image.network(
-              imgUrl,
+            child: CachedNetworkImage(
+              imageUrl: imgUrl,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildGradientBackground(colorScheme),
+              errorWidget: (_, __, ___) => _buildGradientBackground(colorScheme),
             ),
           ),
           Container(
@@ -256,11 +257,11 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                         fit: StackFit.expand,
                         children: [
                           imgUrl != null && imgUrl.isNotEmpty
-                              ? Image.network(
-                                  imgUrl,
+                              ? CachedNetworkImage(
+                                  imageUrl: imgUrl,
                                   fit: BoxFit.cover,
-                                  cacheWidth: 600,
-                                  errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                                  memCacheWidth: 600,
+                                  errorWidget: (_, __, ___) => _buildPlaceholder(),
                                 )
                               : _buildPlaceholder(),
                           // 中心唱片孔

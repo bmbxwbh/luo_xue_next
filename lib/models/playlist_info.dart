@@ -33,4 +33,16 @@ class PlaylistInfo {
         'desc': desc,
         'source': source,
       };
+
+  factory PlaylistInfo.fromJson(Map<String, dynamic> json) => PlaylistInfo(
+        playCount: json['play_count']?.toString() ?? '0',
+        id: json['id']?.toString() ?? '',
+        author: json['author']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        time: json['time']?.toString() ?? '',
+        img: json['img']?.toString() ?? '',
+        total: json['total'] is int ? json['total'] : int.tryParse(json['total']?.toString() ?? '0') ?? 0,
+        desc: json['desc']?.toString() ?? '',
+        source: json['source']?.toString() ?? '',
+      );
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/song_model.dart';
 import '../models/enums.dart';
 import '../store/player_store.dart';
@@ -96,13 +97,13 @@ class SongListTile extends StatelessWidget {
           if (song.displayImg != null && song.displayImg!.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: Image.network(
-                song.displayImg!,
+              child: CachedNetworkImage(
+                imageUrl: song.displayImg!,
                 width: 40,
                 height: 40,
                 fit: BoxFit.cover,
-                cacheWidth: 80,
-                errorBuilder: (_, __, ___) => _buildIndexBadge(context, isPlaying),
+                memCacheWidth: 80,
+                errorWidget: (_, __, ___) => _buildIndexBadge(context, isPlaying),
               ),
             )
           else

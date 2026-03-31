@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/playlist_info.dart';
 import '../../models/song_model.dart';
 import '../../models/enums.dart';
@@ -111,11 +112,11 @@ class _SonglistDetailScreenState extends State<SonglistDetailScreen> {
                   fit: StackFit.expand,
                   children: [
                     widget.playlist.img.isNotEmpty
-                        ? Image.network(
-                            widget.playlist.img,
+                        ? CachedNetworkImage(
+                            imageUrl: widget.playlist.img,
                             fit: BoxFit.cover,
-                            cacheWidth: 600,
-                            errorBuilder: (_, __, ___) => _buildPlaceholder(context),
+                            memCacheWidth: 600,
+                            errorWidget: (_, __, ___) => _buildPlaceholder(context),
                           )
                         : _buildPlaceholder(context),
                     // 渐变遮罩

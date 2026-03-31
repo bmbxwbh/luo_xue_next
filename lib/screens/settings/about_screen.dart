@@ -44,7 +44,7 @@ class AboutScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '洛雪NEXT',
+                '浮生音乐',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -66,7 +66,7 @@ class AboutScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(
-                '洛雪NEXT 是一款基于 Flutter 开发的跨平台音乐播放器，灵感来源于洛雪音乐助手。'
+                '浮生音乐 是一款基于 Flutter 开发的跨平台音乐播放器，灵感来源于洛雪音乐助手。'
                 '本软件支持多个音乐平台的搜索与播放，致力于为用户提供简洁、流畅的音乐体验。',
                 style: TextStyle(
                   fontSize: 14,
@@ -203,7 +203,7 @@ class AboutScreen extends StatelessWidget {
         ),
         content: const SingleChildScrollView(
           child: Text(
-            '欢迎使用洛雪NEXT（以下简称"本软件"）。在使用本软件之前，请您仔细阅读以下免责条款：\n\n'
+            '欢迎使用浮生音乐（以下简称"本软件"）。在使用本软件之前，请您仔细阅读以下免责条款：\n\n'
             '一、软件性质\n'
             '本软件是一款开源的音乐播放器客户端，仅提供音乐搜索和播放功能的入口，'
             '不存储、上传或分发任何音频文件。所有音乐内容均来自第三方平台。\n\n'
@@ -248,7 +248,7 @@ class AboutScreen extends StatelessWidget {
         content: const SingleChildScrollView(
           child: Text(
             'MIT License\n\n'
-            'Copyright (c) 2026 luo_xue_next contributors\n\n'
+            'Copyright (c) 2026 fu_sheng_music contributors\n\n'
             'Permission is hereby granted, free of charge, to any person obtaining a copy '
             'of this software and associated documentation files (the "Software"), to deal '
             'in the Software without restriction, including without limitation the rights '

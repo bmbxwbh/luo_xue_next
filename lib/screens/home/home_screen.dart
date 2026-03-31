@@ -141,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 child: Row(
                                   children: [
                                     Text(
-                                      '洛雪NEXT',
+                                      '浮生音乐',
                                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                             fontWeight: FontWeight.bold,
                                             letterSpacing: 0.5,

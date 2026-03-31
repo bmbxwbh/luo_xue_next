@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../store/player_store.dart';
 import '../screens/play_detail/play_detail_screen.dart';
 import '../utils/global.dart';
@@ -392,13 +393,13 @@ class _AnimatedCoverState extends State<_AnimatedCover> with SingleTickerProvide
         child: url != null && url.isNotEmpty
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(size * 0.25),
-                child: Image.network(
-                  url,
+                child: CachedNetworkImage(
+                  imageUrl: url,
                   width: size,
                   height: size,
                   fit: BoxFit.cover,
-                  cacheWidth: (size * 2).round(),
-                  errorBuilder: (_, __, ___) =>
+                  memCacheWidth: (size * 2).round(),
+                  errorWidget: (_, __, ___) =>
                       Icon(Icons.music_note, size: size * 0.5),
                 ),
               )

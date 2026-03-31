@@ -115,7 +115,7 @@ class LuoXueNextApp extends StatelessWidget {
           builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
             final useSystemMonet = settings.themeColor == 'system';
             return MaterialApp(
-              title: '洛雪NEXT',
+              title: '浮生音乐',
               debugShowCheckedModeBanner: false,
               theme: ThemeData(
                 useMaterial3: true,

@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/enums.dart';
 import '../../models/playlist_info.dart';
 import '../../utils/page_transitions.dart';
+import '../../utils/playlist_cache.dart';
 import '../../music_sdk/kw/song_list.dart';
 import '../../music_sdk/kg/song_list.dart';
 import '../../music_sdk/wy/song_list.dart';
 import '../../music_sdk/tx/song_list.dart';
 import '../../music_sdk/mg/song_list.dart';
 import '../songlist_detail/songlist_detail_screen.dart';
+
+/// 每页加载数量
+const int _pageSize = 18;
 
 /// 推荐歌单 Tab
 class TabSongList extends StatefulWidget {
@@ -50,10 +55,22 @@ class _TabSongListState extends State<TabSongList> {
     }
   }
 
-  /// 加载分类标签
+  /// 加载分类标签（带缓存）
   Future<void> _loadCategories() async {
     try {
+      // 先尝试本地缓存
+      final cached = await PlaylistCache.getCategories(_source.id);
+      if (cached != null && cached.isNotEmpty) {
+        final cats = [_CategoryItem('全部', null)];
+        for (final item in cached) {
+          cats.add(_CategoryItem(item['name']?.toString() ?? '', item['tagId']?.toString()));
+        }
+        if (mounted) setState(() { _categories = cats; });
+        return;
+      }
+
       List<_CategoryItem> cats = [_CategoryItem('全部', null)];
+      final rawList = <Map<String, dynamic>>[];
       switch (_source) {
         case MusicSource.kw:
           final tags = await KwSongList.getTags();
@@ -62,7 +79,10 @@ class _TabSongListState extends State<TabSongList> {
           // 先添加热门标签
           for (final t in hotTags) {
             if (t is Map) {
-              cats.add(_CategoryItem(t['name']?.toString() ?? '', t['id']?.toString()));
+              final name = t['name']?.toString() ?? '';
+              final id = t['id']?.toString();
+              cats.add(_CategoryItem(name, id));
+              rawList.add({'name': name, 'tagId': id});
             }
           }
           // 再添加分类标签组
@@ -70,7 +90,10 @@ class _TabSongListState extends State<TabSongList> {
             if (group is Map && group['list'] is List) {
               for (final t in group['list']) {
                 if (t is Map) {
-                  cats.add(_CategoryItem(t['name']?.toString() ?? '', t['id']?.toString()));
+                  final name = t['name']?.toString() ?? '';
+                  final id = t['id']?.toString();
+                  cats.add(_CategoryItem(name, id));
+                  rawList.add({'name': name, 'tagId': id});
                 }
               }
             }
@@ -82,14 +105,20 @@ class _TabSongListState extends State<TabSongList> {
           final tagGroups = tags['tags'] as List? ?? [];
           for (final t in hotTags) {
             if (t is Map) {
-              cats.add(_CategoryItem(t['name']?.toString() ?? '', t['id']?.toString()));
+              final name = t['name']?.toString() ?? '';
+              final id = t['id']?.toString();
+              cats.add(_CategoryItem(name, id));
+              rawList.add({'name': name, 'tagId': id});
             }
           }
           for (final group in tagGroups) {
             if (group is Map && group['list'] is List) {
               for (final t in group['list']) {
                 if (t is Map) {
-                  cats.add(_CategoryItem(t['name']?.toString() ?? '', t['id']?.toString()));
+                  final name = t['name']?.toString() ?? '';
+                  final id = t['id']?.toString();
+                  cats.add(_CategoryItem(name, id));
+                  rawList.add({'name': name, 'tagId': id});
                 }
               }
             }
@@ -97,21 +126,18 @@ class _TabSongListState extends State<TabSongList> {
           break;
         case MusicSource.tx:
           // QQ 音乐静态分类
-          cats.addAll([
-            _CategoryItem('流行', '6'),
-            _CategoryItem('摇滚', '11'),
-            _CategoryItem('民谣', '12'),
-            _CategoryItem('电子', '14'),
-            _CategoryItem('说唱', '15'),
-            _CategoryItem('古典', '16'),
-            _CategoryItem('轻音乐', '17'),
-            _CategoryItem('影视', '18'),
-            _CategoryItem('R&B', '19'),
-            _CategoryItem('华语', '20'),
-          ]);
+          final txCats = [
+            _CategoryItem('流行', '6'), _CategoryItem('摇滚', '11'),
+            _CategoryItem('民谣', '12'), _CategoryItem('电子', '14'),
+            _CategoryItem('说唱', '15'), _CategoryItem('古典', '16'),
+            _CategoryItem('轻音乐', '17'), _CategoryItem('影视', '18'),
+            _CategoryItem('R&B', '19'), _CategoryItem('华语', '20'),
+          ];
+          cats.addAll(txCats);
+          for (final c in txCats) rawList.add({'name': c.name, 'tagId': c.tagId});
           break;
         case MusicSource.wy:
-          cats.addAll([
+          final wyCats = [
             _CategoryItem('华语', '华语'),
             _CategoryItem('流行', '流行'),
             _CategoryItem('摇滚', '摇滚'),
@@ -122,22 +148,30 @@ class _TabSongListState extends State<TabSongList> {
             _CategoryItem('轻音乐', '轻音乐'),
             _CategoryItem('影视原声', '影视原声'),
             _CategoryItem('ACG', 'ACG'),
-          ]);
+          ];
+          cats.addAll(wyCats);
+          for (final c in wyCats) rawList.add({'name': c.name, 'tagId': c.tagId});
           break;
         case MusicSource.local:
           // 本地音乐不参与在线歌单
           break;
       case MusicSource.mg:
           // 咪咕使用静态分类
-          cats.addAll([
+          final mgCats = [
             _CategoryItem('华语', '15127315'),
             _CategoryItem('流行', '15127316'),
             _CategoryItem('摇滚', '15127317'),
             _CategoryItem('民谣', '15127318'),
             _CategoryItem('电子', '15127319'),
             _CategoryItem('古典', '15127320'),
-          ]);
+          ];
+          cats.addAll(mgCats);
+          for (final c in mgCats) rawList.add({'name': c.name, 'tagId': c.tagId});
           break;
+      }
+      // 保存到缓存
+      if (rawList.isNotEmpty) {
+        await PlaylistCache.setCategories(_source.id, rawList);
       }
       if (mounted) {
         setState(() {
@@ -150,7 +184,7 @@ class _TabSongListState extends State<TabSongList> {
     }
   }
 
-  /// 加载歌单列表
+  /// 加载歌单列表（带缓存 + 18个/页限制）
   Future<void> _loadPlaylists({bool refresh = false}) async {
     if (refresh) {
       _page = 1;
@@ -164,53 +198,49 @@ class _TabSongListState extends State<TabSongList> {
     });
 
     try {
+      // 先尝试本地缓存（非刷新时）
+      if (!refresh) {
+        final cached = await PlaylistCache.getList(_source.id, _categoryTagId, _page);
+        if (cached != null && cached.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _playlists.addAll(cached);
+              _isLoading = false;
+              _hasMore = cached.length >= _pageSize;
+            });
+          }
+          return;
+        }
+      }
+
       Map<String, dynamic> result;
       switch (_source) {
         case MusicSource.kw:
-          result = await KwSongList.getList(
-            'new',
-            _categoryTagId,
-            _page,
-          );
+          result = await KwSongList.getList('new', _categoryTagId, _page);
           break;
         case MusicSource.kg:
-          // KgSongList.getSongList returns List directly, wrap it
-          final kgList = await KgSongList.getSongList(
-            '5', // 推荐
-            _categoryTagId,
-            _page,
-          );
+          final kgList = await KgSongList.getSongList('5', _categoryTagId, _page);
           result = {'list': kgList, 'total': null};
           break;
         case MusicSource.tx:
-          final sortId = _categoryTagId == null ? 5 : 2; // 5=最热, 2=最新
-          result = await TxSongList.getList(
-            sortId,
-            tagId: _categoryTagId,
-            page: _page,
-          );
+          final sortId = _categoryTagId == null ? 5 : 2;
+          result = await TxSongList.getList(sortId, tagId: _categoryTagId, page: _page);
           break;
         case MusicSource.wy:
-          result = await WySongList.getList(
-            'hot',
-            tagId: _categoryTagId,
-            page: _page,
-          );
+          result = await WySongList.getList('hot', tagId: _categoryTagId, page: _page);
           break;
         case MusicSource.local:
-          // 本地音乐不参与在线歌单
           result = {'list': [], 'hasMore': false};
           break;
-      case MusicSource.mg:
-          result = await MgSongList.getList(
-            'recommend',
-            tagId: _categoryTagId,
-            page: _page,
-          );
+        case MusicSource.mg:
+          result = await MgSongList.getList('recommend', tagId: _categoryTagId, page: _page);
           break;
       }
 
-      final list = (result['list'] as List? ?? [])
+      // 解析列表，限制每页 18 个
+      final allItems = (result['list'] as List? ?? []);
+      final pageItems = allItems.length > _pageSize ? allItems.sublist(0, _pageSize) : allItems;
+      final list = pageItems
           .map<PlaylistInfo>((item) => PlaylistInfo(
                 playCount: item['play_count']?.toString() ?? '0',
                 id: item['id']?.toString() ?? '',
@@ -225,6 +255,11 @@ class _TabSongListState extends State<TabSongList> {
               ))
           .toList();
 
+      // 缓存本页数据
+      if (list.isNotEmpty) {
+        await PlaylistCache.setList(_source.id, _categoryTagId, _page, list);
+      }
+
       if (mounted) {
         setState(() {
           if (refresh || _page == 1) {
@@ -233,11 +268,12 @@ class _TabSongListState extends State<TabSongList> {
             _playlists.addAll(list);
           }
           _isLoading = false;
+          // 判断是否还有下一页：有更多数据且当前页满了 18 个
           final total = result['total'];
           if (total != null && total is int) {
             _hasMore = _playlists.length < total;
           } else {
-            _hasMore = list.isNotEmpty;
+            _hasMore = list.length >= _pageSize;
           }
         });
       }
@@ -377,11 +413,14 @@ class _TabSongListState extends State<TabSongList> {
                     child: Hero(
                       tag: 'playlist_${playlist.id}',
                       child: playlist.img.isNotEmpty
-                          ? Image.network(
-                              playlist.img,
+                          ? CachedNetworkImage(
+                              imageUrl: playlist.img,
                               fit: BoxFit.cover,
-                              cacheWidth: 300,
-                              errorBuilder: (_, __, ___) => const Center(
+                              memCacheWidth: 300,
+                              placeholder: (_, __) => const Center(
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              errorWidget: (_, __, ___) => const Center(
                                 child: Icon(Icons.music_note, size: 32),
                               ),
                             )
