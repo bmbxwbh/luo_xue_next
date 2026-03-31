@@ -43,7 +43,9 @@ enum MfPluginMethod {
   importMusicSheet('importMusicSheet'),
   importMusicItem('importMusicItem'),
   getTopLists('getTopLists'),
-  getTopListDetail('getTopListDetail');
+  getTopListDetail('getTopListDetail'),
+  getRecommendSheetTags('getRecommendSheetTags'),
+  getRecommendSheetsByTag('getRecommendSheetsByTag');
 
   const MfPluginMethod(this.name);
   final String name;

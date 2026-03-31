@@ -96,7 +96,18 @@ class MusicFreeRuntime {
       _eval('globalThis.__mf_result_store__ = {};');
 
       // 注入 MF 预加载脚本
-      _eval(kMusicFreePreloadScript);
+      final preloadResult = _eval(kMusicFreePreloadScript);
+      if (preloadResult.isEmpty) {
+        debugPrint('[MF] 预加载脚本执行失败，请检查脚本语法');
+        return false;
+      }
+
+      // 验证关键函数是否存在
+      final checkResult = _eval('typeof executeMfPlugin');
+      if (checkResult != 'function') {
+        debugPrint('[MF] executeMfPlugin 未定义，预加载脚本可能不完整');
+        return false;
+      }
 
       // 执行插件并提取元信息
       final evalCode = '''
@@ -118,6 +129,10 @@ class MusicFreeRuntime {
             hasImportMusicSheet: typeof p.importMusicSheet === 'function',
             hasImportMusicItem: typeof p.importMusicItem === 'function',
             hasGetTopLists: typeof p.getTopLists === 'function',
+            hasGetRecommendSheetTags: typeof p.getRecommendSheetTags === 'function',
+            hasGetRecommendSheetsByTag: typeof p.getRecommendSheetsByTag === 'function',
+            hasGetMusicSheetInfo: typeof p.getMusicSheetInfo === 'function',
+            hasGetTopListDetail: typeof p.getTopListDetail === 'function',
           });
         })()
       ''';
@@ -155,6 +170,10 @@ class MusicFreeRuntime {
       if (data['hasImportMusicSheet'] == true) methods.add(MfPluginMethod.importMusicSheet);
       if (data['hasImportMusicItem'] == true) methods.add(MfPluginMethod.importMusicItem);
       if (data['hasGetTopLists'] == true) methods.add(MfPluginMethod.getTopLists);
+      if (data['hasGetRecommendSheetTags'] == true) methods.add(MfPluginMethod.getRecommendSheetTags);
+      if (data['hasGetRecommendSheetsByTag'] == true) methods.add(MfPluginMethod.getRecommendSheetsByTag);
+      if (data['hasGetMusicSheetInfo'] == true) methods.add(MfPluginMethod.getMusicSheetInfo);
+      if (data['hasGetTopListDetail'] == true) methods.add(MfPluginMethod.getTopListDetail);
 
       final meta = MfPluginMeta(
         platform: data['platform'] as String? ?? '',
@@ -504,11 +523,71 @@ class MusicFreeRuntime {
     return null;
   }
 
-  /// eval 包装
+  /// 调用插件的 getRecommendSheetTags 方法（获取歌单分类标签）
+  Future<Map<String, dynamic>?> getRecommendSheetTags() async {
+    final result = await _callPluginMethod('getRecommendSheetTags', []);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 getRecommendSheetsByTag 方法（获取分类下的歌单列表）
+  Future<Map<String, dynamic>> getRecommendSheetsByTag(Map<String, dynamic> tag, int page) async {
+    final result = await _callPluginMethod('getRecommendSheetsByTag', [tag, page]);
+    if (result is Map) {
+      return {
+        'isEnd': result['isEnd'] ?? true,
+        'data': ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>(),
+      };
+    }
+    return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+  }
+
+  /// 调用插件的 getMusicSheetInfo 方法（获取歌单详情）
+  Future<Map<String, dynamic>?> getMusicSheetInfo(Map<String, dynamic> sheetItem, int page) async {
+    final result = await _callPluginMethod('getMusicSheetInfo', [sheetItem, page]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 importMusicSheet 方法（导入歌单）
+  Future<List<Map<String, dynamic>>> importMusicSheet(String url) async {
+    final result = await _callPluginMethod('importMusicSheet', [url]);
+    if (result is List) return result.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// 调用插件的 getTopLists 方法（获取榜单列表）
+  Future<List<Map<String, dynamic>>> getTopLists() async {
+    final result = await _callPluginMethod('getTopLists', []);
+    if (result is List) return result.cast<Map<String, dynamic>>();
+    if (result is Map && result['data'] is List) return (result['data'] as List).cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// 调用插件的 getTopListDetail 方法（获取榜单详情）
+  Future<Map<String, dynamic>?> getTopListDetail(Map<String, dynamic> topListItem, int page) async {
+    final result = await _callPluginMethod('getTopListDetail', [topListItem, page]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// eval 包装（统一错误处理）
   String _eval(String code) {
     try {
       final result = _jsRuntime!.evaluate(code);
-      return result.stringResult;
+      final str = result.stringResult;
+      // 检测 JS 返回的错误（JS 异常不会抛 Dart 异常，而是返回错误字符串）
+      if (str.startsWith('ReferenceError:') ||
+          str.startsWith('TypeError:') ||
+          str.startsWith('SyntaxError:') ||
+          str.startsWith('Error:') ||
+          str.startsWith('RangeError:') ||
+          str.startsWith('URIError:') ||
+          str.startsWith('EvalError:')) {
+        debugPrint('[MF] JS 错误: ${str.substring(0, str.length > 200 ? 200 : str.length)}');
+        return '';
+      }
+      return str;
     } catch (e) {
       debugPrint('[MF] eval 错误: $e');
       return '';

@@ -46,6 +46,76 @@ class OnlineMusicService {
     _pluginMode = mode;
   }
 
+  /// 是否处于 MF 模式且有可用搜索插件
+  bool get isMfSearchAvailable =>
+      _pluginMode == 'musicfree' && _mfManager != null && _mfManager!.currentPlugin != null;
+
+  /// MF 插件搜索
+  Future<List<Map<String, dynamic>>> mfSearch(String query, int page, String type) async {
+    if (_mfManager == null) return [];
+    try {
+      final result = await _mfManager!.search(query, page, type);
+      return (result['data'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    } catch (e) {
+      debugPrint('[OnlineMusic] MF 搜索失败: $e');
+      return [];
+    }
+  }
+
+  /// MF 插件获取歌单列表（通过 getRecommendSheetsByTag）
+  Future<Map<String, dynamic>> mfGetPlaylists(int page) async {
+    if (_mfManager == null || _mfManager!.currentPlugin == null) {
+      return {'list': <Map<String, dynamic>>[], 'hasMore': false};
+    }
+    try {
+      // 尝试 getRecommendSheetsByTag（传空 tag 获取全部）
+      final tagResult = await _mfManager!.getRecommendSheetsByTag({}, page);
+      final list = (tagResult['data'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (list.isNotEmpty) {
+        return {'list': list, 'hasMore': !(tagResult['isEnd'] ?? true)};
+      }
+      // 回退：用 search('','sheet') 获取歌单
+      final searchResult = await _mfManager!.search('', page, 'sheet');
+      final searchData = (searchResult['data'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      return {'list': searchData, 'hasMore': !(searchResult['isEnd'] ?? true)};
+    } catch (e) {
+      debugPrint('[OnlineMusic] MF 获取歌单失败: $e');
+      return {'list': <Map<String, dynamic>>[], 'hasMore': false};
+    }
+  }
+
+  /// MF 插件获取歌单分类标签
+  Future<List<Map<String, dynamic>>> mfGetPlaylistTags() async {
+    if (_mfManager == null || _mfManager!.currentPlugin == null) return [];
+    try {
+      final result = await _mfManager!.getRecommendSheetTags();
+      if (result == null) return [];
+      final pinned = (result['pinned'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final data = (result['data'] as List?) ?? [];
+      final tags = List<Map<String, dynamic>>.from(pinned);
+      for (final group in data) {
+        if (group is Map && group['data'] is List) {
+          tags.addAll((group['data'] as List).cast<Map<String, dynamic>>());
+        }
+      }
+      return tags;
+    } catch (e) {
+      debugPrint('[OnlineMusic] MF 获取标签失败: $e');
+      return [];
+    }
+  }
+
+  /// MF 插件获取歌单详情
+  Future<Map<String, dynamic>?> mfGetSheetDetail(Map<String, dynamic> sheetItem, int page) async {
+    if (_mfManager == null) return null;
+    try {
+      return await _mfManager!.getMusicSheetInfo(sheetItem, page);
+    } catch (e) {
+      debugPrint('[OnlineMusic] MF 获取歌单详情失败: $e');
+      return null;
+    }
+  }
+
   // ============ 播放URL获取 — 对齐 apis(source).getMusicUrl() ============
 
   /// 获取音乐播放URL — 对齐 apis(source).getMusicUrl()

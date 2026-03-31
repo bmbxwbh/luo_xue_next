@@ -5,6 +5,7 @@ import '../../models/enums.dart';
 import '../../models/playlist_info.dart';
 import '../../utils/page_transitions.dart';
 import '../../utils/playlist_cache.dart';
+import '../../utils/global.dart';
 import '../../music_sdk/kw/song_list.dart';
 import '../../music_sdk/kg/song_list.dart';
 import '../../music_sdk/wy/song_list.dart';
@@ -71,6 +72,23 @@ class _TabSongListState extends State<TabSongList> {
 
       List<_CategoryItem> cats = [_CategoryItem('全部', null)];
       final rawList = <Map<String, dynamic>>[];
+
+      // MF 模式：从 MF 插件获取分类标签
+      if (globalOnlineMusicService.isMfSearchAvailable) {
+        final tags = await globalOnlineMusicService.mfGetPlaylistTags();
+        for (final tag in tags) {
+          final name = tag['title']?.toString() ?? tag['name']?.toString() ?? '';
+          if (name.isEmpty) continue;
+          cats.add(_CategoryItem(name, name));
+          rawList.add({'name': name, 'tagId': name});
+        }
+        if (rawList.isNotEmpty) {
+          await PlaylistCache.setCategories('mf', rawList);
+        }
+        if (mounted) setState(() { _categories = cats; });
+        return;
+      }
+
       switch (_source) {
         case MusicSource.kw:
           final tags = await KwSongList.getTags();
@@ -214,6 +232,39 @@ class _TabSongListState extends State<TabSongList> {
       }
 
       Map<String, dynamic> result;
+
+      // MF 模式：从 MF 插件获取歌单
+      if (globalOnlineMusicService.isMfSearchAvailable) {
+        final mfResult = await globalOnlineMusicService.mfGetPlaylists(_page);
+        final mfList = (mfResult['list'] as List? ?? []);
+        final list = mfList.map<PlaylistInfo>((item) => PlaylistInfo(
+          playCount: item['playCount']?.toString() ?? item['play_count']?.toString() ?? '0',
+          id: item['id']?.toString() ?? '',
+          author: item['artist']?.toString() ?? item['author']?.toString() ?? '',
+          name: item['title']?.toString() ?? item['name']?.toString() ?? '',
+          img: item['artwork']?.toString() ?? item['img']?.toString() ?? '',
+          total: item['total'] is int ? item['total'] : int.tryParse(item['total']?.toString() ?? '0') ?? 0,
+          desc: item['description']?.toString() ?? item['desc']?.toString() ?? '',
+          source: 'mf',
+        )).toList();
+        if (list.isNotEmpty) {
+          await PlaylistCache.setList('mf', null, _page, list);
+        }
+        if (mounted) {
+          setState(() {
+            if (refresh || _page == 1) {
+              _playlists = list;
+            } else {
+              _playlists.addAll(list);
+            }
+            _isLoading = false;
+            _hasMore = mfResult['hasMore'] == true && list.length >= _pageSize;
+          });
+        }
+        return;
+      }
+
+      // 内置音源获取歌单
       switch (_source) {
         case MusicSource.kw:
           result = await KwSongList.getList('new', _categoryTagId, _page);

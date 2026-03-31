@@ -2,6 +2,7 @@ import '../../models/enums.dart';
 import '../../models/song_model.dart';
 import '../../store/search_store.dart';
 import '../../music_sdk/index.dart';
+import '../../utils/global.dart';
 
 /// 搜索结果
 class MusicSearchResult {
@@ -79,6 +80,30 @@ class MusicSearchService {
   /// 搜索单个源 — 对齐 LX Music musicSdk[source].musicSearch.search()
   Future<List<SongModel>> _searchSingle(String keyword, MusicSource source, int page) async {
     try {
+      // MF 模式：如果 MF 插件支持搜索，走 MF 插件
+      if (globalOnlineMusicService.isMfSearchAvailable) {
+        final results = await globalOnlineMusicService.mfSearch(keyword, page, 'music');
+        if (results.isNotEmpty) {
+          return results.map((item) {
+            // MF 返回: id, platform, title, artist, album, artwork, duration
+            final mfSource = MusicSource.fromId(item['platform']?.toString() ?? source.id);
+            final songmid = item['id']?.toString() ?? '';
+            return SongModel.fromLxJson({
+              'songmid': songmid,
+              'name': item['title'] ?? '',
+              'singer': item['artist'] ?? '',
+              'albumName': item['album'] ?? '',
+              'picUrl': item['artwork'] ?? '',
+              'img': item['artwork'] ?? '',
+              'interval': '',
+              '_interval': ((item['duration'] ?? 0) * 1000).toInt(),
+              'strMediaMid': songmid,
+            }, mfSource);
+          }).toList();
+        }
+      }
+
+      // 内置音源搜索
       final result = await MusicSdk.search(source, keyword, page: page, limit: pageSize);
       return _convertSearchResult(result.list, source);
     } catch (e) {

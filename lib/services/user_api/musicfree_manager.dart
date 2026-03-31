@@ -375,6 +375,30 @@ class MusicFreeManager extends ChangeNotifier {
     return _runtime!.getLyric(musicItem);
   }
 
+  /// 获取歌单分类标签
+  Future<Map<String, dynamic>?> getRecommendSheetTags() async {
+    if (_runtime == null) return null;
+    return _runtime!.getRecommendSheetTags();
+  }
+
+  /// 获取分类下的歌单列表
+  Future<Map<String, dynamic>> getRecommendSheetsByTag(Map<String, dynamic> tag, int page) async {
+    if (_runtime == null) return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+    return _runtime!.getRecommendSheetsByTag(tag, page);
+  }
+
+  /// 获取歌单详情
+  Future<Map<String, dynamic>?> getMusicSheetInfo(Map<String, dynamic> sheetItem, int page) async {
+    if (_runtime == null) return null;
+    return _runtime!.getMusicSheetInfo(sheetItem, page);
+  }
+
+  /// 导入歌单
+  Future<List<Map<String, dynamic>>> importMusicSheet(String url) async {
+    if (_runtime == null) return [];
+    return _runtime!.importMusicSheet(url);
+  }
+
   @override
   void dispose() {
     _runtime?.dispose();

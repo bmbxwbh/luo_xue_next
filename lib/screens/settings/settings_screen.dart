@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 import '../../models/enums.dart';
 import '../../services/settings/setting_store.dart';
 import '../../services/player/player_service.dart';
@@ -297,13 +298,97 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('导入 MF 插件'),
-        content: TextField(
-          controller: controller,
-          maxLines: 8,
-          decoration: const InputDecoration(
-            hintText: '粘贴 MusicFree 格式的插件 JS 代码...',
-            border: OutlineInputBorder(),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                hintText: '粘贴 MusicFree 格式的插件 JS 代码...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      try {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['js'],
+                          withData: true,
+                        );
+                        if (result == null || result.files.isEmpty) return;
+                        final file = result.files.first;
+                        String script;
+                        if (file.bytes != null) {
+                          script = utf8.decode(file.bytes!);
+                        } else if (file.path != null) {
+                          script = await File(file.path!).readAsString(encoding: utf8);
+                        } else {
+                          throw Exception('无法读取文件');
+                        }
+                        controller.text = script;
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('❌ 读取文件失败: $e')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.file_open, size: 18),
+                    label: const Text('文件导入'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final urlController = TextEditingController();
+                      final url = await showDialog<String>(
+                        context: context,
+                        builder: (urlCtx) => AlertDialog(
+                          title: const Text('从 URL 导入'),
+                          content: TextField(
+                            controller: urlController,
+                            decoration: const InputDecoration(
+                              hintText: '输入插件 JS 文件的 URL 地址...',
+                              border: OutlineInputBorder(),
+                            ),
+                            autofocus: true,
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(urlCtx), child: const Text('取消')),
+                            FilledButton(onPressed: () => Navigator.pop(urlCtx, urlController.text.trim()), child: const Text('导入')),
+                          ],
+                        ),
+                      );
+                      if (url == null || url.isEmpty) return;
+                      try {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('正在下载...')));
+                        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
+                        if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}');
+                        controller.text = utf8.decode(response.bodyBytes);
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('❌ 下载失败: $e')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.link, size: 18),
+                    label: const Text('URL 导入'),
+                  ),
+                ),
+              ],
+            ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -465,13 +550,24 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // 导入按钮
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _importUserApi(context, ctx),
-                  icon: const Icon(Icons.file_open, size: 18),
-                  label: const Text('从文件导入 (.js)'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _importUserApi(context, ctx),
+                      icon: const Icon(Icons.file_open, size: 18),
+                      label: const Text('文件导入'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _importUserApiFromUrl(context, ctx),
+                      icon: const Icon(Icons.link, size: 18),
+                      label: const Text('URL 导入'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -578,6 +674,59 @@ class SettingsScreen extends StatelessWidget {
         );
 
         // 重新显示弹窗
+        _showUserApiDialog(context);
+      }
+    } catch (e) {
+      if (dialogCtx.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ 导入失败: $e')),
+        );
+      }
+    }
+  }
+
+  /// 从 URL 导入洛雪脚本
+  Future<void> _importUserApiFromUrl(BuildContext context, BuildContext dialogCtx) async {
+    final urlController = TextEditingController();
+    final url = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('从 URL 导入'),
+        content: TextField(
+          controller: urlController,
+          decoration: const InputDecoration(
+            hintText: '输入 .js 文件的 URL 地址...',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, urlController.text.trim()), child: const Text('导入')),
+        ],
+      ),
+    );
+    if (url == null || url.isEmpty) return;
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('正在下载...')));
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}');
+      final script = utf8.decode(response.bodyBytes);
+
+      final userApi = context.read<UserApiManager>();
+      final apiInfo = await userApi.importUserApi(script);
+      await userApi.setUserApi(apiInfo.id);
+
+      if (dialogCtx.mounted) {
+        Navigator.pop(dialogCtx);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(
+            userApi.isInitialized
+                ? '✅ 初始化成功: ${apiInfo.name}'
+                : '⚠️ 已导入但初始化失败: ${apiInfo.name}',
+          )),
+        );
         _showUserApiDialog(context);
       }
     } catch (e) {
