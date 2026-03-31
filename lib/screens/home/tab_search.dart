@@ -223,80 +223,71 @@ class _TabSearchState extends State<TabSearch> {
                   ),
                   child: Row(
                     children: [
-                      // 聚合搜索开关
+                      // 聚合搜索开关 / MF 插件名
                       Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isFullMf)
-                            // 完整 MF 模式：显示插件名
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              margin: const EdgeInsets.only(left: 4),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.extension_rounded, size: 14, color: colorScheme.onPrimaryContainer),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    mfManager.currentPlugin?.name ?? 'MF插件',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onPrimaryContainer),
+                        children: isFullMf
+                            ? [
+                                // 完整 MF 模式：只显示插件名
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  margin: const EdgeInsets.only(left: 4),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
-                                ],
-                              ),
-                            )
-                          else ...[
-                          FilterChip(
-                            label: const Text('聚合', style: TextStyle(fontSize: 11)),
-                            selected: _isAggregateSearch,
-                            onSelected: (v) {
-                              if (v) {
-                                _search(aggregate: true);
-                              }
-                            },
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          if (!_isAggregateSearch) ...[
-                            PopupMenuButton<MusicSource>(
-                              initialValue: searchStore.tempSource,
-                              onSelected: (src) => searchStore.setTempSource(src),
-                              itemBuilder: (_) => MusicSource.values.map((src) =>
-                                PopupMenuItem(value: src, child: Text(src.name))
-                              ).toList(),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                margin: const EdgeInsets.only(left: 4),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(16),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.extension_rounded, size: 14, color: colorScheme.onPrimaryContainer),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        mfManager.currentPlugin?.name ?? 'MF插件',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onPrimaryContainer),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      searchStore.tempSource.name,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: colorScheme.onPrimaryContainer,
+                              ]
+                            : [
+                                // 普通模式：聚合开关 + 音源选择
+                                FilterChip(
+                                  label: const Text('聚合', style: TextStyle(fontSize: 11)),
+                                  selected: _isAggregateSearch,
+                                  onSelected: (v) {
+                                    if (v) _search(aggregate: true);
+                                  },
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                if (!_isAggregateSearch)
+                                  PopupMenuButton<MusicSource>(
+                                    initialValue: searchStore.tempSource,
+                                    onSelected: (src) => searchStore.setTempSource(src),
+                                    itemBuilder: (_) => MusicSource.values
+                                        .map((src) => PopupMenuItem(value: src, child: Text(src.name)))
+                                        .toList(),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      margin: const EdgeInsets.only(left: 4),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            searchStore.tempSource.name,
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onPrimaryContainer),
+                                          ),
+                                          Icon(Icons.arrow_drop_down, size: 16, color: colorScheme.onPrimaryContainer),
+                                        ],
                                       ),
                                     ),
-                                    Icon(
-                                      Icons.arrow_drop_down,
-                                      size: 16,
-                                      color: colorScheme.onPrimaryContainer,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                          ], // close else [...]
-                        ],
+                                  ),
+                              ],
+                      ),
                       const SizedBox(width: 4),
                       // 输入框
                       Expanded(
