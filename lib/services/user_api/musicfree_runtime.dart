@@ -465,14 +465,18 @@ class MusicFreeRuntime {
   }
 
   /// 调用插件的 search 方法
-  Future<List<Map<String, dynamic>>> search(
+  /// MF 原版返回: { isEnd?: boolean, data: IMusicItem[] }
+  Future<Map<String, dynamic>> search(
     String query, int page, String type,
   ) async {
     final result = await _callPluginMethod('search', [query, page, type]);
     if (result is Map) {
-      return ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>();
+      return {
+        'isEnd': result['isEnd'] ?? true,
+        'data': ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>(),
+      };
     }
-    return [];
+    return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
   }
 
   /// 调用插件的 getMediaSource 方法

@@ -333,7 +333,8 @@ class MusicFreeManager extends ChangeNotifier {
   }
 
   /// 搜索
-  Future<List<Map<String, dynamic>>> search(
+  /// 返回: { isEnd: bool, data: List<Map> }
+  Future<Map<String, dynamic>> search(
     String query,
     int page,
     String type, {
@@ -345,12 +346,12 @@ class MusicFreeManager extends ChangeNotifier {
         try {
           await setActivePlugin(info.id);
         } catch (e) {
-          return [];
+          return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
         }
       }
     }
 
-    if (_runtime == null) return [];
+    if (_runtime == null) return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
     return _runtime!.search(query, page, type);
   }
 

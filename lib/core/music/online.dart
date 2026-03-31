@@ -71,6 +71,7 @@ class OnlineMusicService {
             'album': musicInfo.albumName,
             'artwork': musicInfo.img,
             'duration': musicInfo.intervalSec,
+            'qualities': {},
           };
           // quality 映射：128k→low, 320k→standard, flac→high, flac24bit→super
           final mfQuality = _lxQualityToMf(quality.value);
@@ -346,8 +347,34 @@ class OnlineMusicService {
   /// 用户API启用时优先使用
   Future<LyricInfo> getLyricInfo(SongModel musicInfo) async {
     try {
-      // 用户API启用时优先尝试
-      if (_userApiManager != null && _userApiManager!.isInitialized) {
+      // MF 模式：优先使用 MF 插件获取歌词
+      if (_pluginMode == 'musicfree' && _mfManager != null) {
+        try {
+          final mfItem = {
+            'id': musicInfo.songmid,
+            'platform': musicInfo.source.id,
+            'title': musicInfo.name,
+            'artist': musicInfo.singer,
+            'album': musicInfo.albumName,
+            'artwork': musicInfo.img,
+            'duration': musicInfo.intervalSec,
+          };
+          final lyricData = await _mfManager!.getLyric(mfItem);
+          if (lyricData != null && (lyricData['rawLrc'] ?? '').toString().isNotEmpty) {
+            debugPrint('[OnlineMusic] 歌词来自MF插件 ✅');
+            return LyricInfo(
+              lyric: lyricData['rawLrc'] ?? '',
+              tlyric: lyricData['translation'],
+            );
+          }
+          debugPrint('[OnlineMusic] MF插件歌词为空，回退MusicSdk');
+        } catch (e) {
+          debugPrint('[OnlineMusic] MF插件获取歌词失败: $e，回退MusicSdk');
+        }
+      }
+
+      // 洛雪模式：用户API音源获取歌词
+      if (_pluginMode != 'musicfree' && _userApiManager != null && _userApiManager!.isInitialized) {
         try {
           final lyricData = await _userApiManager!.getLyric(
             source: musicInfo.source.id,
