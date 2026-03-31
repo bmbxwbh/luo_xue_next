@@ -295,9 +295,8 @@ class _TabSearchState extends State<TabSearch> {
                               ),
                             ),
                           ],
+                          ], // close else [...]
                         ],
-                      ),
-                        ], // close else
                       const SizedBox(width: 4),
                       // 输入框
                       Expanded(

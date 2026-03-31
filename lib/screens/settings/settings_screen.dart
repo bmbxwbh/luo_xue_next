@@ -305,7 +305,7 @@ class SettingsScreen extends StatelessWidget {
           Consumer<SettingStore>(
             builder: (ctx, setting, _) => SwitchListTile(
               dense: true,
-              leading: const SizedBox(width: 48),
+              secondary: const SizedBox(width: 48),
               title: const Text('完整插件模式', style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 setting.isFullMfMode ? '搜索/歌单/播放全部走 MF 插件' : '仅播放链接走 MF 插件',
