@@ -50,6 +50,7 @@
 ### 核心功能
 - **多平台音源聚合**：支持网易云音乐、QQ 音乐、酷狗、酷我、咪咕等主流平台
 - **用户 API 音源**：支持加载第三方 JavaScript 插件扩展音源
+- **双插件系统**：支持洛雪脚本模式 + MusicFree 插件模式，用户可自由切换
 - **高品质播放**：支持标准/高品/无损音质播放
 - **歌词同步**：逐行歌词实时同步显示
 - **歌单管理**：支持在线歌单、本地收藏、自定义歌单
@@ -86,24 +87,32 @@ lib/
 - **HTTP 请求**：http + 自封装 HttpClient
 - **加密**：encrypt + crypto（网易云 eapi 加密等）
 
-## 📦 用户 API 音源系统
+## 📦 双插件系统
 
-洛雪音乐 Next 支持加载第三方 JavaScript 插件作为音源。插件系统基于原项目的 QuickJS 方案，在 Flutter 端使用 flutter_js 运行 JS 脚本。
+洛雪音乐 Next 支持两种插件模式，用户可在设置中自由切换。
+
+### 洛雪脚本模式
+基于原项目的 QuickJS 方案，兼容洛雪音乐的外部音源脚本（如独家音源.js）。
+
+### MusicFree 插件模式
+兼容 [MusicFree](https://github.com/maotoumao/MusicFree) 格式的插件，提供 `require('axios')`、`require('crypto-js')` 等常用库的桥接，插件开发更简单。
 
 ### 插件结构
 ```
 lib/services/user_api/
-├── user_api_preload.dart   # 预加载脚本
-├── user_api_runtime.dart   # 运行时（JS ↔ Dart 事件通信）
-├── user_api_manager.dart   # 管理器
-└── user_api.dart           # 用户 API 封装
+├── user_api_preload.dart        # 洛雪预加载脚本（沙箱加固）
+├── user_api_runtime.dart        # 洛雪运行时
+├── user_api_manager.dart        # 洛雪插件管理器
+├── plugin_format_detector.dart  # 插件格式自动检测
+├── musicfree_preload.dart       # MF 预加载脚本（require 桥接）
+├── musicfree_runtime.dart       # MF 运行时（Promise + HTTP 轮询）
+└── musicfree_manager.dart       # MF 插件管理器
 ```
 
-### 支持的插件格式
-- ikun.js 格式
-- 洛雪独家音源格式
-
-详细设计文档请参考 [docs/lx_source_system.md](docs/lx_source_system.md)
+### 工作模式
+- 内置 5 源（网易云/QQ/酷狗/酷我/咪咕）永远可用，负责搜索和元信息
+- 洛雪脚本模式：洛雪脚本负责获取播放链接
+- MF 模式：MF 插件负责获取播放链接（插件也可以自带搜索功能）
 
 ## 🚀 快速开始
 

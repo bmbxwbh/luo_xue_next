@@ -586,27 +586,347 @@ var __mf_he__ = {
   }
 };
 
-// ===================== MF cheerio stub =====================
-var __mf_cheerio__ = {
-  load: function(html) {
-    // stub：返回空的 $ 函数
-    var $ = function(selector) {
-      return {
-        text: function() { return ''; },
-        attr: function(name) { return null; },
-        html: function() { return ''; },
-        find: function(sel) { return $(sel); },
-        each: function(fn) { return this; },
-        map: function(fn) { return []; },
-        length: 0,
-        eq: function(i) { return $(selector); },
-        first: function() { return $(selector); },
-        last: function() { return $(selector); },
-      };
-    };
-    return $;
+// ===================== MF cheerio 实现（轻量 HTML 解析器 + CSS 选择器） =====================
+var __mf_cheerio__ = (function() {
+  var SELF_CLOSE = { img:1, br:1, hr:1, input:1, meta:1, link:1, area:1, base:1, col:1, embed:1, source:1, track:1, wbr:1 };
+
+  // 解析 HTML 为扁平元素列表
+  function parseHtml(html) {
+    var elems = [{ tag:'_root', attrStr:'', ch:[], par:-1, text:'' }];
+    var stk = [0], pos = 0, len = html.length;
+    while (pos < len) {
+      if (html[pos] === '<') {
+        var end = html.indexOf('>', pos);
+        if (end === -1) break;
+        if (html[pos+1] === '!') {
+          if (html.substr(pos+2, 2) === '--') {
+            pos = html.indexOf('-->', pos+3);
+            if (pos === -1) break; pos += 3;
+          } else { pos = end + 1; }
+          continue;
+        }
+        if (html[pos+1] === '/') {
+          var clTag = html.substring(pos+2, end).trim().toLowerCase();
+          for (var si = stk.length-1; si > 0; si--) {
+            if (elems[stk[si]].tag === clTag) { stk.length = si; break; }
+          }
+          pos = end + 1; continue;
+        }
+        var inner = html.substring(pos+1, end);
+        var sp = inner.search(/[\s\/]/);
+        var tag, attrStr;
+        if (sp === -1) { tag = inner.toLowerCase(); attrStr = ''; }
+        else { tag = inner.substring(0, sp).toLowerCase(); attrStr = inner.substring(sp); }
+        var selfClose = SELF_CLOSE[tag] || inner[inner.length-1] === '/';
+        var idx = elems.length;
+        elems.push({ tag:tag, attrStr:attrStr, ch:[], par:stk[stk.length-1], text:'' });
+        elems[stk[stk.length-1]].ch.push(idx);
+        if (!selfClose) stk.push(idx);
+        pos = end + 1;
+      } else {
+        var nx = html.indexOf('<', pos);
+        if (nx === -1) nx = len;
+        var txt = html.substring(pos, nx);
+        if (txt.replace(/\s+/g, '').length > 0) {
+          var ti = elems.length;
+          elems.push({ tag:'_text', attrStr:'', ch:[], par:stk[stk.length-1], text:txt });
+          elems[stk[stk.length-1]].ch.push(ti);
+        }
+        pos = nx;
+      }
+    }
+    return elems;
   }
-};
+
+  // 解析属性字符串
+  function parseAttrs(attrStr) {
+    var attrs = {};
+    var rx = /([\w\-:]+)(?:=(?:'([^']*)'|"([^"]*)"|(\S+)))?/g;
+    var m;
+    while ((m = rx.exec(attrStr)) !== null) {
+      attrs[m[1].toLowerCase()] = m[2] !== undefined ? m[2] : (m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : ''));
+    }
+    return attrs;
+  }
+
+  // 解析单个选择器片段（支持 tag.class#id[attr] 复合写法）
+  function parseSel(sel) {
+    var parts = [];
+    var rx = /\.([a-zA-Z0-9_-]+)|#([a-zA-Z0-9_-]+)|\[([^\]]+)\]|([a-zA-Z][\w-]*)/g;
+    var m, hasTag = false;
+    while ((m = rx.exec(sel)) !== null) {
+      if (m[1] !== undefined) { parts.push({ t:'cls', v:m[1] }); }
+      else if (m[2] !== undefined) { parts.push({ t:'id', v:m[2] }); }
+      else if (m[3] !== undefined) {
+        var am = m[3].match(/^([\w\-:]+)(?:([~|^$*]?=)\s*['"]?([^'"\]]*)['"]?)?$/);
+        if (am) parts.push({ t:'attr', k:am[1].toLowerCase(), op:am[2]||'', v:am[3]||'' });
+      }
+      else if (m[4] !== undefined) { parts.push({ t:'tag', v:m[4].toLowerCase() }); hasTag = true; }
+    }
+    if (!hasTag && parts.length > 0) {
+      // 如果没有显式 tag，需要匹配任何 tag
+      var hasExplicitMatch = false;
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].t === 'tag') { hasExplicitMatch = true; break; }
+      }
+      if (!hasExplicitMatch) parts.unshift({ t:'any' });
+    }
+    return parts;
+  }
+
+  // 匹配元素
+  function matchSel(elems, idx, parts) {
+    var el = elems[idx];
+    if (!el || el.tag === '_text' || el.tag === '_root') return false;
+    var attrs = null;
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.t === 'tag' && el.tag !== p.v) return false;
+      if (p.t === 'any') { if (el.tag === '_text' || el.tag === '_root') return false; }
+      if (p.t === 'cls') {
+        if (!attrs) attrs = parseAttrs(el.attrStr);
+        var cls = (attrs['class'] || '');
+        if ((' '+cls+' ').indexOf(' '+p.v+' ') < 0) return false;
+      }
+      if (p.t === 'id') {
+        if (!attrs) attrs = parseAttrs(el.attrStr);
+        if (attrs['id'] !== p.v) return false;
+      }
+      if (p.t === 'attr') {
+        if (!attrs) attrs = parseAttrs(el.attrStr);
+        var av = attrs[p.k];
+        if (av === undefined) return false;
+        if (!p.op) continue;
+        if (p.op === '=' && av !== p.v) return false;
+        if (p.op === '*=' && av.indexOf(p.v) < 0) return false;
+        if (p.op === '^=' && av.substring(0, p.v.length) !== p.v) return false;
+        if (p.op === '$=' && av.substring(av.length - p.v.length) !== p.v) return false;
+        if (p.op === '~=' && (' '+av+' ').indexOf(' '+p.v+' ') < 0) return false;
+      }
+    }
+    return true;
+  }
+
+  // 递归查找
+  function findIn(elems, rootIdx, result, matchFn) {
+    var ch = elems[rootIdx].ch;
+    for (var i = 0; i < ch.length; i++) {
+      if (matchFn(elems, ch[i])) result.push(ch[i]);
+      findIn(elems, ch[i], result, matchFn);
+    }
+  }
+
+  // 提取元素 innerHTML
+  function getInnerHtml(elems, idx) {
+    var el = elems[idx];
+    if (el.tag === '_text') return el.text;
+    var html = '';
+    for (var i = 0; i < el.ch.length; i++) {
+      var child = elems[el.ch[i]];
+      if (child.tag === '_text') { html += child.text; }
+      else { html += getOuterHtml(elems, el.ch[i]); }
+    }
+    return html;
+  }
+
+  function getOuterHtml(elems, idx) {
+    var el = elems[idx];
+    if (el.tag === '_text') return el.text;
+    var inner = getInnerHtml(elems, idx);
+    return '<' + el.tag + (el.attrStr ? ' ' + el.attrStr.trim() : '') + '>' + inner + '</' + el.tag + '>';
+  }
+
+  // 提取纯文本
+  function getText(elems, idx) {
+    var el = elems[idx];
+    if (el.tag === '_text') return el.text;
+    var t = '';
+    for (var i = 0; i < el.ch.length; i++) t += getText(elems, el.ch[i]);
+    return t;
+  }
+
+  // cheerio 对象构造
+  function makeCheerio(elems, indices) {
+    var arr = indices || [];
+    var obj = {
+      length: arr.length,
+      each: function(fn) { for (var i = 0; i < arr.length; i++) fn.call(makeCheerio(elems, [arr[i]]), i); return obj; },
+      map: function(fn) { var r = []; for (var i = 0; i < arr.length; i++) r.push(fn.call(makeCheerio(elems, [arr[i]]), i)); return r; },
+      eq: function(i) { return i >= 0 && i < arr.length ? makeCheerio(elems, [arr[i]]) : makeCheerio(elems, []); },
+      first: function() { return obj.eq(0); },
+      last: function() { return obj.eq(arr.length - 1); },
+      text: function() { var t = ''; for (var i = 0; i < arr.length; i++) t += getText(elems, arr[i]); return t.replace(/\s+/g, ' ').trim(); },
+      html: function() { return arr.length > 0 ? getInnerHtml(elems, arr[0]) : null; },
+      attr: function(name) {
+        if (arr.length === 0) return undefined;
+        var attrs = parseAttrs(elems[arr[0]].attrStr);
+        return attrs[name.toLowerCase()];
+      },
+      find: function(sel) {
+        var res = [];
+        var sParts = parseSel(sel.trim());
+        var hasChild = false;
+        for (var si = 0; si < sParts.length; si++) { if (sParts[si].t === 'tag' || sParts[si].t === 'cls' || sParts[si].t === 'id' || sParts[si].t === 'attr') { hasChild = true; break; } }
+        if (!hasChild) return makeCheerio(elems, []);
+        for (var i = 0; i < arr.length; i++) {
+          findIn(elems, arr[i], res, function(e, idx) { return matchSel(e, idx, sParts); });
+        }
+        return makeCheerio(elems, res);
+      },
+      closest: function(sel) {
+        var sParts = parseSel(sel.trim());
+        for (var i = 0; i < arr.length; i++) {
+          var p = elems[arr[i]].par;
+          while (p > 0) {
+            if (matchSel(elems, p, sParts)) return makeCheerio(elems, [p]);
+            p = elems[p].par;
+          }
+        }
+        return makeCheerio(elems, []);
+      },
+      parent: function() {
+        var res = [];
+        for (var i = 0; i < arr.length; i++) {
+          var p = elems[arr[i]].par;
+          if (p > 0 && res.indexOf(p) < 0) res.push(p);
+        }
+        return makeCheerio(elems, res);
+      },
+      children: function(sel) {
+        var res = [];
+        var sParts = sel ? parseSel(sel.trim()) : null;
+        for (var i = 0; i < arr.length; i++) {
+          var ch = elems[arr[i]].ch;
+          for (var j = 0; j < ch.length; j++) {
+            if (!sParts || matchSel(elems, ch[j], sParts)) res.push(ch[j]);
+          }
+        }
+        return makeCheerio(elems, res);
+      },
+      contents: function() { return obj.children(); },
+      next: function() {
+        var res = [];
+        for (var i = 0; i < arr.length; i++) {
+          var par = elems[arr[i]].par;
+          if (par < 0) continue;
+          var sibs = elems[par].ch;
+          var myIdx = sibs.indexOf(arr[i]);
+          if (myIdx >= 0 && myIdx + 1 < sibs.length) res.push(sibs[myIdx + 1]);
+        }
+        return makeCheerio(elems, res);
+      },
+      prev: function() {
+        var res = [];
+        for (var i = 0; i < arr.length; i++) {
+          var par = elems[arr[i]].par;
+          if (par < 0) continue;
+          var sibs = elems[par].ch;
+          var myIdx = sibs.indexOf(arr[i]);
+          if (myIdx > 0) res.push(sibs[myIdx - 1]);
+        }
+        return makeCheerio(elems, res);
+      },
+      siblings: function() {
+        var res = [];
+        for (var i = 0; i < arr.length; i++) {
+          var par = elems[arr[i]].par;
+          if (par < 0) continue;
+          var sibs = elems[par].ch;
+          for (var j = 0; j < sibs.length; j++) {
+            if (sibs[j] !== arr[i] && res.indexOf(sibs[j]) < 0) res.push(sibs[j]);
+          }
+        }
+        return makeCheerio(elems, res);
+      },
+      get: function(i) { return i >= 0 ? arr[i] : arr[arr.length + i]; },
+      toArray: function() { return arr.slice(); },
+      val: function() { return obj.attr('value') || ''; },
+      prop: function(name) { return obj.attr(name); },
+      hasClass: function(cls) {
+        if (arr.length === 0) return false;
+        var a = parseAttrs(elems[arr[0]].attrStr);
+        return (' '+(a['class']||'')+' ').indexOf(' '+cls+' ') >= 0;
+      }
+    };
+    return obj;
+  }
+
+  return {
+    load: function(html) {
+      var elems = parseHtml(html || '');
+      var $ = function(sel) {
+        if (!sel) return makeCheerio(elems, []);
+        if (typeof sel === 'string') {
+          // 简单 CSS 选择器：支持逗号分隔的多选择器
+          var parts = sel.split(',');
+          var allRes = [];
+          for (var pi = 0; pi < parts.length; pi++) {
+            var trimmed = parts[pi].trim();
+            if (!trimmed) continue;
+
+            // 处理 "parent > child" 直接子选择器
+            var gtParts = trimmed.split('>');
+            if (gtParts.length === 2) {
+              var parentSel = gtParts[0].trim();
+              var childSel = gtParts[1].trim();
+              var parentParts = parseSel(parentSel);
+              var childParts = parseSel(childSel);
+              var parentRes = [];
+              findIn(elems, 0, parentRes, function(e, idx) { return matchSel(e, idx, parentParts); });
+              for (var pri = 0; pri < parentRes.length; pri++) {
+                var chs = elems[parentRes[pri]].ch;
+                for (var ci = 0; ci < chs.length; ci++) {
+                  if (matchSel(elems, chs[ci], childParts) && allRes.indexOf(chs[ci]) < 0) allRes.push(chs[ci]);
+                }
+              }
+              continue;
+            }
+
+            // 处理 "ancestor descendant" 后代选择器
+            var spaceParts = trimmed.split(/\s+/);
+            if (spaceParts.length >= 2) {
+              // 先找最右边的
+              var lastSel = parseSel(spaceParts[spaceParts.length - 1]);
+              var candidates = [];
+              findIn(elems, 0, candidates, function(e, idx) { return matchSel(e, idx, lastSel); });
+              // 逐级向上验证祖先
+              for (var si = spaceParts.length - 2; si >= 0; si--) {
+                var ancParts = parseSel(spaceParts[si]);
+                var filtered = [];
+                for (var ci2 = 0; ci2 < candidates.length; ci2++) {
+                  var p2 = elems[candidates[ci2]].par;
+                  while (p2 > 0) {
+                    if (matchSel(elems, p2, ancParts)) { filtered.push(candidates[ci2]); break; }
+                    p2 = elems[p2].par;
+                  }
+                }
+                candidates = filtered;
+              }
+              for (var ri = 0; ri < candidates.length; ri++) {
+                if (allRes.indexOf(candidates[ri]) < 0) allRes.push(candidates[ri]);
+              }
+              continue;
+            }
+
+            // 简单选择器
+            var sParts = parseSel(trimmed);
+            var res = [];
+            findIn(elems, 0, res, function(e, idx) { return matchSel(e, idx, sParts); });
+            for (var ri2 = 0; ri2 < res.length; ri2++) {
+              if (allRes.indexOf(res[ri2]) < 0) allRes.push(res[ri2]);
+            }
+          }
+          return makeCheerio(elems, allRes);
+        }
+        return makeCheerio(elems, []);
+      };
+      $.root = function() { return makeCheerio(elems, [0]); };
+      $.html = function() { return getInnerHtml(elems, 0); };
+      $.text = function() { return getText(elems, 0).replace(/\s+/g, ' ').trim(); };
+      return $;
+    }
+  };
+})();
 
 // ===================== MF dayjs 简化版 =====================
 var __mf_dayjs__ = function(date) {
