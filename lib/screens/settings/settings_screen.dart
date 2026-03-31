@@ -288,7 +288,7 @@ class SettingsScreen extends StatelessWidget {
           onTap: () => _showMfImportDialog(context),
         ),
         // 导入歌单（MF 插件支持时显示）
-        if (hasMfPlugin && mfManager.currentPlugin!.methods.any((m) => m == MfPluginMethod.importMusicSheet))
+        if (hasMfPlugin && mfManager.currentPlugin!.meta.methods.any((m) => m == MfPluginMethod.importMusicSheet))
           ListTile(
             dense: true,
             leading: const SizedBox(width: 48),
@@ -400,7 +400,6 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
             ),
           ],
         ),
