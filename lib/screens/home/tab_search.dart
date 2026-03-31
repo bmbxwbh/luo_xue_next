@@ -5,6 +5,7 @@ import '../../models/song_model.dart';
 import '../../store/search_store.dart';
 import '../../services/music/hot_search_store.dart';
 import '../../services/settings/setting_store.dart';
+import '../../services/user_api/musicfree_manager.dart';
 import '../../services/player/player_service.dart';
 import '../../widgets/source_selector.dart';
 import '../../widgets/song_list_tile.dart';
@@ -43,6 +44,7 @@ class _TabSearchState extends State<TabSearch> {
     searchStore.setTempSource(setting.defaultSource);
 
     _searchService = MusicSearchService(searchStore);
+    _searchService.setFullMfMode(setting.isFullMfMode);
     _searchController.addListener(_onSearchChanged);
     context.read<HotSearchStore>().loadHotSearch();
   }
@@ -201,6 +203,9 @@ class _TabSearchState extends State<TabSearch> {
   Widget _buildSearchBar() {
     final searchStore = context.watch<SearchStore>();
     final colorScheme = Theme.of(context).colorScheme;
+    final setting = context.watch<SettingStore>();
+    final mfManager = context.watch<MusicFreeManager>();
+    final isFullMf = setting.isFullMfMode && mfManager.currentPlugin != null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -222,6 +227,28 @@ class _TabSearchState extends State<TabSearch> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (isFullMf)
+                            // 完整 MF 模式：显示插件名
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              margin: const EdgeInsets.only(left: 4),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.extension_rounded, size: 14, color: colorScheme.onPrimaryContainer),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    mfManager.currentPlugin?.name ?? 'MF插件',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onPrimaryContainer),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else ...[
                           FilterChip(
                             label: const Text('聚合', style: TextStyle(fontSize: 11)),
                             selected: _isAggregateSearch,
@@ -270,6 +297,7 @@ class _TabSearchState extends State<TabSearch> {
                           ],
                         ],
                       ),
+                        ], // close else
                       const SizedBox(width: 4),
                       // 输入框
                       Expanded(

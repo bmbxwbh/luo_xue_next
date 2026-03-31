@@ -300,6 +300,24 @@ class SettingsScreen extends StatelessWidget {
             trailing: Icon(Icons.playlist_add, size: 18, color: Theme.of(context).colorScheme.primary),
             onTap: () => _showImportSheetDialog(context, mfManager),
         ),
+        // 完整 MF 插件模式开关
+        if (hasMfPlugin)
+          Consumer<SettingStore>(
+            builder: (ctx, setting, _) => SwitchListTile(
+              dense: true,
+              leading: const SizedBox(width: 48),
+              title: const Text('完整插件模式', style: TextStyle(fontSize: 14)),
+              subtitle: Text(
+                setting.isFullMfMode ? '搜索/歌单/播放全部走 MF 插件' : '仅播放链接走 MF 插件',
+                style: const TextStyle(fontSize: 11),
+              ),
+              value: setting.isFullMfMode,
+              onChanged: (v) {
+                setting.setIsFullMfMode(v);
+                globalOnlineMusicService.setIsFullMfMode(v);
+              },
+            ),
+          ),
       ],
     );
   }

@@ -41,6 +41,9 @@ void initGlobalPlayer({
     globalMusicFreeManager = musicFreeManager;
     globalOnlineMusicService.setMusicFreeManager(musicFreeManager);
   }
+
+  // 同步完整 MF 插件模式
+  globalOnlineMusicService.setIsFullMfMode(settingStore.isFullMfMode);
   
   globalPlayer = Player(
     playerStore: globalPlayerStore,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/enums.dart';
 import '../../services/settings/setting_store.dart';
+import '../../services/user_api/musicfree_manager.dart';
 import 'tab_songlist.dart';
 import 'tab_leaderboard.dart';
 
@@ -114,6 +115,12 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final setting = context.watch<SettingStore>();
+    final mfManager = context.watch<MusicFreeManager>();
+    final isFullMf = setting.isFullMfMode && mfManager.currentPlugin != null;
+    final displaySource = isFullMf
+        ? (mfManager.currentPlugin?.name ?? 'MF插件')
+        : _source.name;
 
     return SafeArea(
       child: Column(
@@ -150,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     const Spacer(),
                                     // 音源选择按钮
                                     InkWell(
-                                      onTap: _showSourceSelector,
+                                      onTap: isFullMf ? null : _showSourceSelector,
                                       borderRadius: BorderRadius.circular(16),
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -161,18 +168,20 @@ class _HomeScreenState extends State<HomeScreen>
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.source_rounded, size: 16, color: colorScheme.onPrimaryContainer),
+                                            Icon(isFullMf ? Icons.extension_rounded : Icons.source_rounded, size: 16, color: colorScheme.onPrimaryContainer),
                                             const SizedBox(width: 4),
                                             Text(
-                                              _source.name,
+                                              displaySource,
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w500,
                                                 color: colorScheme.onPrimaryContainer,
                                               ),
                                             ),
-                                            const SizedBox(width: 2),
-                                            Icon(Icons.arrow_drop_down, size: 18, color: colorScheme.onPrimaryContainer),
+                                            if (!isFullMf) ...[
+                                              const SizedBox(width: 2),
+                                              Icon(Icons.arrow_drop_down, size: 18, color: colorScheme.onPrimaryContainer),
+                                            ],
                                           ],
                                         ),
                                       ),

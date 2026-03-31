@@ -23,6 +23,9 @@ class OnlineMusicService {
   /// 当前插件模式
   String _pluginMode = 'lx'; // 'lx' 或 'musicfree'
 
+  /// 是否完整 MF 插件模式
+  bool _isFullMfMode = false;
+
   /// 获取当前插件模式
   String get pluginMode => _pluginMode;
 
@@ -46,9 +49,18 @@ class OnlineMusicService {
     _pluginMode = mode;
   }
 
+  /// 设置完整 MF 插件模式
+  void setIsFullMfMode(bool enabled) {
+    _isFullMfMode = enabled;
+  }
+
   /// 是否处于 MF 模式且有可用搜索插件
   bool get isMfSearchAvailable =>
-      _pluginMode == 'musicfree' && _mfManager != null && _mfManager!.currentPlugin != null;
+      (_pluginMode == 'musicfree' || _isFullMfMode) && _mfManager != null && _mfManager!.currentPlugin != null;
+
+  /// 是否有可用的 MF 插件（不检查模式，只检查插件是否存在）
+  bool get mfManagerAvailable =>
+      _mfManager != null && _mfManager!.currentPlugin != null;
 
   /// MF 插件搜索
   Future<List<Map<String, dynamic>>> mfSearch(String query, int page, String type) async {
@@ -130,7 +142,7 @@ class OnlineMusicService {
       final songmid = musicInfo.songmid;
 
       // MF 模式：优先使用 MF 插件获取播放链接
-      if (_pluginMode == 'musicfree' && _mfManager != null) {
+      if ((_pluginMode == 'musicfree' || _isFullMfMode) && _mfManager != null) {
         try {
           // 构建 MF 格式的 musicItem
           final mfItem = {
@@ -418,7 +430,7 @@ class OnlineMusicService {
   Future<LyricInfo> getLyricInfo(SongModel musicInfo) async {
     try {
       // MF 模式：优先使用 MF 插件获取歌词
-      if (_pluginMode == 'musicfree' && _mfManager != null) {
+      if ((_pluginMode == 'musicfree' || _isFullMfMode) && _mfManager != null) {
         try {
           final mfItem = {
             'id': musicInfo.songmid,

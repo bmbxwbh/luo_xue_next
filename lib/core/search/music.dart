@@ -3,6 +3,7 @@ import '../../models/song_model.dart';
 import '../../store/search_store.dart';
 import '../../music_sdk/index.dart';
 import '../../utils/global.dart';
+import '../../services/settings/setting_store.dart';
 
 /// 搜索结果
 class MusicSearchResult {
@@ -32,7 +33,15 @@ class MusicSearchService {
   /// 每页数量
   static const int pageSize = 30;
 
+  /// 是否完整 MF 插件模式
+  bool _isFullMfMode = false;
+
   MusicSearchService(this._searchStore);
+
+  /// 设置完整 MF 插件模式
+  void setFullMfMode(bool enabled) {
+    _isFullMfMode = enabled;
+  }
 
   /// 搜索歌曲
   /// [keyword] 搜索关键词
@@ -81,7 +90,9 @@ class MusicSearchService {
   Future<List<SongModel>> _searchSingle(String keyword, MusicSource source, int page) async {
     try {
       // MF 模式：如果 MF 插件支持搜索，走 MF 插件
-      if (globalOnlineMusicService.isMfSearchAvailable) {
+      final isMfAvailable = globalOnlineMusicService.isMfSearchAvailable ||
+          (_isFullMfMode && globalOnlineMusicService.mfManagerAvailable);
+      if (isMfAvailable) {
         final results = await globalOnlineMusicService.mfSearch(keyword, page, 'music');
         if (results.isNotEmpty) {
           return results.map((item) {

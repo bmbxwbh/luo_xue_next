@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../services/settings/setting_store.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/enums.dart';
 import '../../models/playlist_info.dart';
@@ -74,7 +75,9 @@ class _TabSongListState extends State<TabSongList> {
       final rawList = <Map<String, dynamic>>[];
 
       // MF 模式：从 MF 插件获取分类标签
-      if (globalOnlineMusicService.isMfSearchAvailable) {
+      final setting = context.read<SettingStore>();
+      final isFullMf = setting.isFullMfMode && globalOnlineMusicService.mfManagerAvailable;
+      if (globalOnlineMusicService.isMfSearchAvailable || isFullMf) {
         final tags = await globalOnlineMusicService.mfGetPlaylistTags();
         for (final tag in tags) {
           final name = tag['title']?.toString() ?? tag['name']?.toString() ?? '';
@@ -234,7 +237,9 @@ class _TabSongListState extends State<TabSongList> {
       Map<String, dynamic> result;
 
       // MF 模式：从 MF 插件获取歌单
-      if (globalOnlineMusicService.isMfSearchAvailable) {
+      final setting = context.read<SettingStore>();
+      final isFullMf = setting.isFullMfMode && globalOnlineMusicService.mfManagerAvailable;
+      if (globalOnlineMusicService.isMfSearchAvailable || isFullMf) {
         final mfResult = await globalOnlineMusicService.mfGetPlaylists(_page);
         final mfList = (mfResult['list'] as List? ?? []);
         final list = mfList.map<PlaylistInfo>((item) => PlaylistInfo(
