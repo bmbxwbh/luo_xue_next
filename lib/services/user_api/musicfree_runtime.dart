@@ -123,7 +123,23 @@ class MusicFreeRuntime {
       ''';
 
       final result = _eval(evalCode);
-      final data = jsonDecode(result) as Map<String, dynamic>;
+      if (result.isEmpty) {
+        debugPrint('[MF] 插件执行返回空，可能脚本有语法错误');
+        return false;
+      }
+
+      dynamic parsed;
+      try {
+        parsed = jsonDecode(result);
+      } catch (e) {
+        debugPrint('[MF] 插件解析 JSON 失败: $e, result=$result');
+        return false;
+      }
+      if (parsed is! Map<String, dynamic>) {
+        debugPrint('[MF] 插件解析结果不是对象: ${parsed.runtimeType}');
+        return false;
+      }
+      final data = parsed;
 
       if (data.containsKey('error')) {
         debugPrint('[MF] 插件解析错误: ${data['error']}');
@@ -335,6 +351,8 @@ class MusicFreeRuntime {
 
           if (action == 'mf_request') {
             _handleHttpRequest(data);
+          } else if (action == 'mf_crypto') {
+            _handleCryptoRequest(data);
           } else if (action == '__log__') {
             debugPrint('[MF Plugin] ${data['msg']}');
           }
@@ -361,33 +379,38 @@ class MusicFreeRuntime {
     final timeout = options['timeout'] as int? ?? 15000;
 
     try {
-      // 使用 Dart 的 http 包发请求
-      final client = _createHttpClient();
+      // 使用 dart:io HttpClient 发请求
+      final client = io.HttpClient();
       final uri = Uri.parse(url);
-      late dynamic response;
+      final timeoutDuration = Duration(milliseconds: timeout);
 
-      if (method == 'GET') {
-        response = await client.getUrl(uri).then((req) {
-          headers.forEach((k, v) => req.headers.set(k, v));
-          return req.close();
-        }).timeout(Duration(milliseconds: timeout));
-      } else if (method == 'POST') {
-        response = await client.postUrl(uri).then((req) {
-          headers.forEach((k, v) => req.headers.set(k, v));
-          if (body != null) {
-            req.write(body is String ? body : jsonEncode(body));
-          }
-          return req.close();
-        }).timeout(Duration(milliseconds: timeout));
+      late io.HttpClientRequest req;
+      if (method == 'POST') {
+        req = await client.postUrl(uri).timeout(timeoutDuration);
+      } else if (method == 'PUT') {
+        req = await client.putUrl(uri).timeout(timeoutDuration);
       } else {
-        response = await client.getUrl(uri).then((req) {
-          headers.forEach((k, v) => req.headers.set(k, v));
-          return req.close();
-        }).timeout(Duration(milliseconds: timeout));
+        req = await client.getUrl(uri).timeout(timeoutDuration);
       }
 
-      final responseBody = await response.transform(utf8.decoder).join();
-      final statusCode = response.statusCode;
+      // 设置 headers
+      headers.forEach((k, v) => req.headers.set(k, v));
+
+      // 写入 body
+      if (body != null && (method == 'POST' || method == 'PUT')) {
+        final bodyStr = body is String ? body : jsonEncode(body);
+        req.write(bodyStr);
+      }
+
+      final resp = await req.close().timeout(timeoutDuration);
+      final statusCode = resp.statusCode;
+      final responseBody = await resp.transform(utf8.decoder).join().timeout(timeoutDuration);
+
+      // 收集响应 headers
+      final respHeaders = <String, String>{};
+      resp.headers.forEach((name, values) {
+        respHeaders[name] = values.join(', ');
+      });
 
       // 注入响应到 JS
       final respJson = jsonEncode({
@@ -396,7 +419,7 @@ class MusicFreeRuntime {
         'response': {
           'statusCode': statusCode,
           'statusMessage': '',
-          'headers': {},
+          'headers': respHeaders,
           'body': responseBody,
         }
       });
@@ -412,6 +435,32 @@ class MusicFreeRuntime {
       });
       final escapedErr = errJson.replaceAll("'", "\\'");
       _eval("handleMfNativeResponse(JSON.parse('$escapedErr'));");
+    }
+  }
+
+  /// 处理 MF 插件的加密请求（SHA256/AES 异步回退）
+  /// 注意：纯 JS SHA256/AES 已在 preload 中实现，此方法作为兜底
+  Future<void> _handleCryptoRequest(Map<String, dynamic> data) async {
+    final requestKey = data['requestKey'] as String?;
+    if (requestKey == null) return;
+
+    try {
+      // 纯 JS 已处理，此分支不应触发，但保留以防万一
+      final respJson = jsonEncode({
+        'requestKey': requestKey,
+        'error': null,
+        'result': '',
+      });
+      final escapedResp = respJson.replaceAll("'", "\\'");
+      _eval("handleMfCryptoResponse(JSON.parse('$escapedResp'));");
+    } catch (e) {
+      final errJson = jsonEncode({
+        'requestKey': requestKey,
+        'error': e.toString(),
+        'result': null,
+      });
+      final escapedErr = errJson.replaceAll("'", "\\'");
+      _eval("handleMfCryptoResponse(JSON.parse('$escapedErr'));");
     }
   }
 
@@ -451,12 +500,6 @@ class MusicFreeRuntime {
     return null;
   }
 
-  /// 创建 HTTP 客户端
-  dynamic _createHttpClient() {
-    // 使用 dart:io 的 HttpClient
-    return _HttpClient();
-  }
-
   /// eval 包装
   String _eval(String code) {
     try {
@@ -485,51 +528,5 @@ class MusicFreeRuntime {
     _currentPlugin = null;
     _initialized = false;
     _pendingPromises.clear();
-  }
-}
-
-// HTTP 客户端辅助类
-class _HttpClient {
-  final io.HttpClient _client = io.HttpClient();
-
-  Future<_HttpRequest> getUrl(Uri uri) async {
-    final req = await _client.getUrl(uri);
-    return _HttpRequest(req);
-  }
-
-  Future<_HttpRequest> postUrl(Uri uri) async {
-    final req = await _client.postUrl(uri);
-    return _HttpRequest(req);
-  }
-
-  void close() => _client.close();
-}
-
-class _HttpRequest {
-  final io.HttpClientRequest _req;
-  _HttpRequest(this._req);
-
-  _HttpRequest headers(Map<String, String> headers) {
-    headers.forEach((k, v) => _req.headers.set(k, v));
-    return this;
-  }
-
-  void write(dynamic body) {
-    if (body is String) _req.write(body);
-  }
-
-  Future<_HttpResponse> close() async {
-    final resp = await _req.close();
-    return _HttpResponse(resp);
-  }
-}
-
-class _HttpResponse {
-  final io.HttpClientResponse _resp;
-  _HttpResponse(this._resp);
-
-  int get statusCode => _resp.statusCode;
-  Future<String> transform(dynamic decoder) async {
-    return await _resp.transform(utf8.decoder).join();
   }
 }
