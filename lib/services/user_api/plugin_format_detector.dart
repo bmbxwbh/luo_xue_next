@@ -74,6 +74,15 @@ class MfPluginMeta {
   /// 用户自定义变量定义
   final List<MfUserVariable>? userVariables;
 
+  /// 插件排序权重
+  final int order;
+
+  /// 主键字段列表
+  final List<String> primaryKey;
+
+  /// 用户提示信息
+  final Map<String, dynamic> hints;
+
   /// 脚本中实际定义的方法名列表
   final List<MfPluginMethod> methods;
 
@@ -85,6 +94,9 @@ class MfPluginMeta {
     this.supportedSearchType = const [],
     this.cacheControl,
     this.userVariables,
+    this.order = 0,
+    this.primaryKey = const [],
+    this.hints = const {},
     this.methods = const [],
   });
 

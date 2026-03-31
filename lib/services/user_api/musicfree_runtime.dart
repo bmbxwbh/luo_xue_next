@@ -133,6 +133,11 @@ class MusicFreeRuntime {
             hasGetRecommendSheetsByTag: typeof p.getRecommendSheetsByTag === 'function',
             hasGetMusicSheetInfo: typeof p.getMusicSheetInfo === 'function',
             hasGetTopListDetail: typeof p.getTopListDetail === 'function',
+            appVersion: p.appVersion || '',
+            order: p.order || 0,
+            cacheControl: p.cacheControl || '',
+            primaryKey: p.primaryKey || [],
+            hints: p.hints || {},
           });
         })()
       ''';
@@ -179,6 +184,11 @@ class MusicFreeRuntime {
         platform: data['platform'] as String? ?? '',
         version: data['version'] as String?,
         srcUrl: data['srcUrl'] as String?,
+        appVersion: data['appVersion'] as String?,
+        cacheControl: data['cacheControl'] as String?,
+        order: data['order'] is int ? data['order'] : 0,
+        primaryKey: (data['primaryKey'] as List?)?.cast<String>() ?? [],
+        hints: (data['hints'] as Map?)?.cast<String, dynamic>() ?? {},
         methods: methods,
       );
 

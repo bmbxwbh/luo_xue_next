@@ -12,6 +12,7 @@ import '../../services/settings/setting_store.dart';
 import '../../services/player/player_service.dart';
 import '../../services/user_api/user_api_manager.dart';
 import '../../services/user_api/musicfree_manager.dart';
+import '../../services/user_api/plugin_format_detector.dart';
 import '../../utils/global.dart';
 import '../../utils/app_logger.dart';
 import '../../utils/page_transitions.dart';
@@ -286,6 +287,19 @@ class SettingsScreen extends StatelessWidget {
           trailing: Icon(Icons.add, size: 18, color: Theme.of(context).colorScheme.primary),
           onTap: () => _showMfImportDialog(context),
         ),
+        // 导入歌单（MF 插件支持时显示）
+        if (hasMfPlugin && mfManager.currentPlugin!.methods.any((m) => m == MfPluginMethod.importMusicSheet))
+          ListTile(
+            dense: true,
+            leading: const SizedBox(width: 48),
+            title: Text(
+              '导入外部歌单',
+              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary),
+            ),
+            subtitle: const Text('通过链接/酷狗码导入歌单', style: TextStyle(fontSize: 11)),
+            trailing: Icon(Icons.playlist_add, size: 18, color: Theme.of(context).colorScheme.primary),
+            onTap: () => _showImportSheetDialog(context, mfManager),
+        ),
       ],
     );
   }
@@ -410,6 +424,57 @@ class SettingsScreen extends StatelessWidget {
                       ? '✅ ${result['message']}'
                       : '❌ ${result['message']}')),
                 );
+              }
+            },
+            child: const Text('导入'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// MF 导入外部歌单对话框
+  void _showImportSheetDialog(BuildContext context, MusicFreeManager mfManager) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('导入外部歌单'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: '输入歌单链接或ID...',
+            border: OutlineInputBorder(),
+            helperText: '支持酷狗码、歌单链接等格式',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+            onPressed: () async {
+              final url = controller.text.trim();
+              if (url.isEmpty) return;
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('正在导入歌单，请稍候...')),
+              );
+              try {
+                final songs = await mfManager.importMusicSheet(url);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(songs.isNotEmpty
+                        ? '✅ 导入成功，共 ${songs.length} 首'
+                        : '⚠️ 未找到歌曲')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('❌ 导入失败: $e')),
+                  );
+                }
               }
             },
             child: const Text('导入'),
