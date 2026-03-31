@@ -131,47 +131,49 @@ class UnifiedBottomBar extends StatelessWidget {
 
     return Stack(
       children: [
-        // 左侧导航 — 播放时向左滑出
+        // 左侧导航 — 播放时隐藏
         AnimatedPositioned(
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOutCubic,
-          left: isPlaying ? 4 : 0,
-          right: isPlaying ? 0 : 0, // 由 Row 控制
+          left: 0,
           top: 0,
           bottom: 0,
-          width: isPlaying ? 60 : null,
+          width: isPlaying ? 0 : null,
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 300),
-            opacity: isPlaying ? 0.6 : 1.0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildSingleNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
-                _buildSingleNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
-              ],
-            ),
+            opacity: isPlaying ? 0.0 : 1.0,
+            child: isPlaying
+                ? const SizedBox.shrink()
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildSingleNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
+                      _buildSingleNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
+                    ],
+                  ),
           ),
         ),
 
-        // 右侧导航 — 播放时向右滑出
+        // 右侧导航 — 播放时隐藏
         AnimatedPositioned(
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOutCubic,
-          right: isPlaying ? 4 : 0,
-          left: isPlaying ? 0 : 0,
+          right: 0,
           top: 0,
           bottom: 0,
-          width: isPlaying ? 60 : null,
+          width: isPlaying ? 0 : null,
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 300),
-            opacity: isPlaying ? 0.6 : 1.0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildSingleNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
-                _buildSingleNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
-              ],
-            ),
+            opacity: isPlaying ? 0.0 : 1.0,
+            child: isPlaying
+                ? const SizedBox.shrink()
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildSingleNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
+                      _buildSingleNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
+                    ],
+                  ),
           ),
         ),
 

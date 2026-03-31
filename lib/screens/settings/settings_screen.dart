@@ -109,6 +109,8 @@ class SettingsScreen extends StatelessWidget {
     final list = userApi.state.list;
     final mfPlugins = mfManager.plugins;
 
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
     // 当前模式
     final isMfMode = globalOnlineMusicService.pluginMode == 'musicfree';
 
@@ -133,10 +135,10 @@ class SettingsScreen extends StatelessWidget {
                 onSelectionChanged: (selected) {
                   final mode = selected.first ? 'musicfree' : 'lx';
                   globalOnlineMusicService.setPluginMode(mode);
-                  // 保存到 SharedPreferences
                   SharedPreferences.getInstance().then((prefs) {
                     prefs.setString('plugin_mode', mode);
                   });
+                  setLocalState(() {}); // 触发局部重建
                 },
               ),
             ],
@@ -153,6 +155,8 @@ class SettingsScreen extends StatelessWidget {
           _buildMfPluginSection(context, mfManager, hasMfPlugin, mfPlugins),
         ],
       ],
+    );
+      },
     );
   }
 
