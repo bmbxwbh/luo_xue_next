@@ -8,6 +8,10 @@
 -keep class io.flutter.** { *; }
 -keep class io.flutter.plugins.** { *; }
 
+# Google Play Core（Flutter deferred components，我们不用但引擎引用了）
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
+
 # cached_network_image / flutter_cache_manager
 -keep class com.baseflow.flutter_cached_network_image.** { *; }
 -keep class com.baseflow.permissionhandler.** { *; }
