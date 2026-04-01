@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import '../../models/enums.dart';
@@ -94,6 +95,7 @@ class Player {
 
       if (url != null && url.isNotEmpty) {
         _playerStore.setStatusText('正在播放...');
+        debugPrint('[Player] URL 来自缓存: $url');
         await _setResource(musicInfo, url);
         return;
       }
@@ -104,6 +106,7 @@ class Player {
         quality: quality,
         isRefresh: isRefresh,
       );
+      debugPrint('[Player] URL 来自在线: $url');
 
       if (url == null || url.isEmpty) {
         _playerStore.setStatusText('获取播放链接失败');
@@ -133,14 +136,10 @@ class Player {
   /// 设置音频资源并播放
   Future<void> _setResource(SongModel musicInfo, String url) async {
     try {
+      debugPrint('[Player] _setResource: 设置音频 URL=$url');
       await _audioPlayer.setUrl(url);
-      final resumeTime = _settingStore.isSavePlayTime
-          ? _playerStore.progress.nowPlayTime
-          : 0;
-      if (resumeTime > 0) {
-        await _audioPlayer.seek(Duration(milliseconds: (resumeTime * 1000).toInt()));
-      }
       await _audioPlayer.play();
+      debugPrint('[Player] _setResource: 播放成功');
       _playerStore.setIsPlay(true);
       _playerStore.setStatusText('');
 
@@ -226,10 +225,12 @@ class Player {
 
   /// 播放指定歌曲
   Future<void> playMusic(SongModel song) async {
+    debugPrint('[Player] playMusic: ${song.name} (${song.source.id}_${song.songmid})');
     _playerStore.setPlayMusicInfo(PlayMusicInfo(
       musicInfo: song,
       listId: 'default',
     ));
+    debugPrint('[Player] playMusicInfo 已设置, playMusicInfo=${_playerStore.playMusicInfo?.musicInfo.name}');
 
     // 本地音乐直接播放
     if (song.source == MusicSource.local && song.localPath != null) {
