@@ -1,6 +1,7 @@
 /// 全局播放器实例
 library;
 
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/player/player.dart';
 import '../core/music/online.dart';
 import '../store/player_store.dart';
@@ -44,6 +45,12 @@ void initGlobalPlayer({
 
   // 同步完整 MF 插件模式
   globalOnlineMusicService.setIsFullMfMode(settingStore.isFullMfMode);
+
+  // 同步插件模式（lx / musicfree）
+  SharedPreferences.getInstance().then((prefs) {
+    final savedMode = prefs.getString('plugin_mode') ?? 'lx';
+    globalOnlineMusicService.setPluginMode(savedMode);
+  });
   
   globalPlayer = Player(
     playerStore: globalPlayerStore,
