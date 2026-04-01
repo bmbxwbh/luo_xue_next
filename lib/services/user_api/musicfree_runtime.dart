@@ -109,13 +109,15 @@ class MusicFreeRuntime {
         return false;
       }
 
-      // 执行插件并提取元信息
+      // 执行插件并提取元信息（同时缓存实例到全局变量，避免重复执行）
       final evalCode = '''
         (function() {
           var env = { appVersion: '1.0.0', os: 'android', lang: 'zh-CN', getUserVariables: function() { return {}; }, get userVariables() { return {}; } };
           var result = executeMfPlugin('$escaped', env);
           if (!result.success) return JSON.stringify({ error: result.error });
           var p = result.instance;
+          // 缓存实例，后续调用直接复用，不重新执行脚本
+          globalThis.__mf_plugin_instance__ = p;
           return JSON.stringify({
             platform: p.platform || '',
             version: p.version || '',
@@ -238,20 +240,17 @@ class MusicFreeRuntime {
   }) async {
     if (!isInitialized) return null;
 
-    final escaped = _escapeForJs(_pluginScript);
     final argsJson = jsonEncode(args);
 
-    // 1. 调用插件方法，返回 Promise
+    // 1. 调用插件方法 — 使用 init() 中缓存的实例，不重新执行脚本
     final promiseId = 'mf_promise_${++_promiseIdCounter}';
     final callCode = '''
       (function() {
-        var env = { appVersion: '1.0.0', os: 'android', lang: 'zh-CN', getUserVariables: function() { return {}; }, get userVariables() { return {}; } };
-        var result = executeMfPlugin('$escaped', env);
-        if (!result.success) {
-          globalThis.__mf_result_store__['$promiseId'] = JSON.stringify({error: result.error});
+        var plugin = globalThis.__mf_plugin_instance__;
+        if (!plugin) {
+          globalThis.__mf_result_store__['$promiseId'] = JSON.stringify({error: 'plugin instance not cached'});
           return 'done';
         }
-        var plugin = result.instance;
         var method = plugin['$methodName'];
         if (typeof method !== 'function') {
           globalThis.__mf_result_store__['$promiseId'] = JSON.stringify({error: 'method $methodName not found'});
