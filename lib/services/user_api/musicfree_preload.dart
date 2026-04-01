@@ -951,6 +951,7 @@ var __mf_dayjs__ = function(date) {
 // ===================== MF big-integer 简化版 =====================
 var __mf_biginteger__ = function(n) {
   var val = BigInt(n || 0);
+  var _zero = BigInt(0);
   return {
     value: val,
     toString: function(radix) { return val.toString(radix || 10); },
@@ -961,9 +962,9 @@ var __mf_biginteger__ = function(n) {
     mod: function(x) { return __mf_biginteger__(val % BigInt(x.value || x)); },
     compareTo: function(x) { var b = BigInt(x.value || x); return val < b ? -1 : val > b ? 1 : 0; },
     equals: function(x) { return val === BigInt(x.value || x); },
-    isNegative: function() { return val < 0n; },
-    isZero: function() { return val === 0n; },
-    abs: function() { return __mf_biginteger__(val < 0n ? -val : val); },
+    isNegative: function() { return val < _zero; },
+    isZero: function() { return val === _zero; },
+    abs: function() { return __mf_biginteger__(val < _zero ? -val : val); },
   };
 };
 

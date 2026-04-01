@@ -37,7 +37,11 @@ class MusicFreePluginInfo {
     required this.methods,
   });
 
-  bool get supportsSearch => methods.contains('search');
+  bool get supportsSearch =>
+      methods.contains('search') ||
+      methods.contains('searchMusic') ||
+      methods.contains('searchAlbum') ||
+      methods.contains('searchMusicSheet');
   bool get supportsGetMediaSource => methods.contains('getMediaSource');
   bool get supportsGetLyric => methods.contains('getLyric');
 

@@ -122,6 +122,9 @@ class MusicFreeRuntime {
             srcUrl: p.srcUrl || '',
             supportedSearchType: p.supportedSearchType || [],
             hasSearch: typeof p.search === 'function',
+            hasSearchMusic: typeof p.searchMusic === 'function',
+            hasSearchAlbum: typeof p.searchAlbum === 'function',
+            hasSearchMusicSheet: typeof p.searchMusicSheet === 'function',
             hasGetMediaSource: typeof p.getMediaSource === 'function',
             hasGetLyric: typeof p.getLyric === 'function',
             hasGetMusicInfo: typeof p.getMusicInfo === 'function',
@@ -168,6 +171,9 @@ class MusicFreeRuntime {
 
       final methods = <MfPluginMethod>[];
       if (data['hasSearch'] == true) methods.add(MfPluginMethod.search);
+      if (data['hasSearchMusic'] == true) methods.add(MfPluginMethod.searchMusic);
+      if (data['hasSearchAlbum'] == true) methods.add(MfPluginMethod.searchAlbum);
+      if (data['hasSearchMusicSheet'] == true) methods.add(MfPluginMethod.searchMusicSheet);
       if (data['hasGetMediaSource'] == true) methods.add(MfPluginMethod.getMediaSource);
       if (data['hasGetLyric'] == true) methods.add(MfPluginMethod.getLyric);
       if (data['hasGetMusicInfo'] == true) methods.add(MfPluginMethod.getMusicInfo);
@@ -495,10 +501,32 @@ class MusicFreeRuntime {
 
   /// 调用插件的 search 方法
   /// MF 原版返回: { isEnd?: boolean, data: IMusicItem[] }
+  /// Parcel 打包的插件可能用 searchMusic/searchAlbum/searchMusicSheet 替代
   Future<Map<String, dynamic>> search(
     String query, int page, String type,
   ) async {
-    final result = await _callPluginMethod('search', [query, page, type]);
+    // 优先使用标准 search(query, page, type)
+    dynamic result = await _callPluginMethod('search', [query, page, type]);
+
+    // 标准 search 无效时，回退到类型特化方法（Parcel 打包格式）
+    if (result == null) {
+      String methodName;
+      switch (type) {
+        case 'music':
+          methodName = 'searchMusic';
+          break;
+        case 'album':
+          methodName = 'searchAlbum';
+          break;
+        case 'sheet':
+          methodName = 'searchMusicSheet';
+          break;
+        default:
+          methodName = 'searchMusic';
+      }
+      result = await _callPluginMethod(methodName, [query, page]);
+    }
+
     if (result is Map) {
       return {
         'isEnd': result['isEnd'] ?? true,
@@ -509,27 +537,48 @@ class MusicFreeRuntime {
   }
 
   /// 调用插件的 getMediaSource 方法
+  /// 部分插件（如酷我念心、网易念心、网易 Ciallo、xiaowo）不提供 getMediaSource，
+  /// 搜索结果自带 url 字段，此时直接从 musicItem 取 url
   Future<Map<String, dynamic>?> getMediaSource(
     Map<String, dynamic> musicItem, String quality,
   ) async {
-    final result = await _callPluginMethod('getMediaSource', [musicItem, quality]);
-    if (result is Map) {
-      final url = result['url'] as String?;
-      if (url != null && url.isNotEmpty) {
-        return {
-          'url': url,
-          if (result['headers'] != null) 'headers': result['headers'],
-          if (result['userAgent'] != null) 'userAgent': result['userAgent'],
-        };
+    // 先尝试调用插件的 getMediaSource
+    if (currentPlugin?.meta.methods.contains(MfPluginMethod.getMediaSource) == true) {
+      final result = await _callPluginMethod('getMediaSource', [musicItem, quality]);
+      if (result is Map) {
+        final url = result['url'] as String?;
+        if (url != null && url.isNotEmpty) {
+          return {
+            'url': url,
+            if (result['headers'] != null) 'headers': result['headers'],
+            if (result['userAgent'] != null) 'userAgent': result['userAgent'],
+          };
+        }
       }
     }
+
+    // getMediaSource 不可用或返回空时，回退到搜索结果中的 url 字段
+    final url = musicItem['url'] as String?;
+    if (url != null && url.isNotEmpty) {
+      debugPrint('[MF] getMediaSource 回退到搜索结果 url: $url');
+      return {'url': url};
+    }
+
     return null;
   }
 
   /// 调用插件的 getLyric 方法
+  /// 多数插件用 rawLrc，网易插件用 rawLrcTxt，统一处理
   Future<Map<String, dynamic>?> getLyric(Map<String, dynamic> musicItem) async {
     final result = await _callPluginMethod('getLyric', [musicItem]);
-    if (result is Map) return result.cast<String, dynamic>();
+    if (result is Map) {
+      final map = result.cast<String, dynamic>();
+      // 统一歌词字段：rawLrcTxt → rawLrc
+      if (map['rawLrc'] == null && map['rawLrcTxt'] != null) {
+        map['rawLrc'] = map['rawLrcTxt'];
+      }
+      return map;
+    }
     return null;
   }
 

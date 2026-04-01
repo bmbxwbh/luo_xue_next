@@ -35,6 +35,9 @@ enum MfSearchType {
 /// MusicFree 插件方法名枚举
 enum MfPluginMethod {
   search('search'),
+  searchMusic('searchMusic'),
+  searchAlbum('searchAlbum'),
+  searchMusicSheet('searchMusicSheet'),
   getMediaSource('getMediaSource'),
   getLyric('getLyric'),
   getMusicInfo('getMusicInfo'),
@@ -100,8 +103,12 @@ class MfPluginMeta {
     this.methods = const [],
   });
 
-  /// 是否支持搜索
-  bool get supportsSearch => methods.contains(MfPluginMethod.search);
+  /// 是否支持搜索（标准 search 或 Parcel 打包的 searchMusic/searchAlbum/searchMusicSheet）
+  bool get supportsSearch =>
+      methods.contains(MfPluginMethod.search) ||
+      methods.contains(MfPluginMethod.searchMusic) ||
+      methods.contains(MfPluginMethod.searchAlbum) ||
+      methods.contains(MfPluginMethod.searchMusicSheet);
 
   /// 是否支持获取媒体源
   bool get supportsGetMediaSource =>
