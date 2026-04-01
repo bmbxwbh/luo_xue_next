@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/player/player_service.dart';
 import '../../services/settings/setting_store.dart';
 import '../../services/music/list_store.dart';
+import '../../store/player_store.dart';
 import '../../models/lyric_info.dart';
 import '../../utils/format_util.dart';
 import '../../utils/global.dart';
@@ -63,18 +64,19 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final store = context.watch<PlayerStore>();
     final player = context.watch<PlayerService>();
-    final info = player.playInfo;
+    final playMusicInfo = store.playMusicInfo;
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (info == null) {
+    if (playMusicInfo == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('播放详情')),
         body: const Center(child: Text('暂无播放歌曲')),
       );
     }
 
-    if (player.isPlaying) {
+    if (store.isPlay) {
       _rotationController.repeat();
     } else {
       _rotationController.stop();
@@ -84,7 +86,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
       body: Stack(
         children: [
           // 背景：封面模糊图片或渐变
-          _buildBackground(info.musicInfo.displayImg, colorScheme),
+          _buildBackground(playMusicInfo.musicInfo.displayImg, colorScheme),
           // 内容
           Container(
             decoration: BoxDecoration(
@@ -102,7 +104,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
             child: SafeArea(
               child: Column(
                 children: [
-                  _buildAppBar(player, info),
+                  _buildAppBar(player, playMusicInfo),
                   // 主内容区（封面/歌词交叉淡入淡出）
                   Expanded(
                     child: AnimatedCrossFade(
@@ -111,7 +113,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                       crossFadeState: _showLyrics
                           ? CrossFadeState.showSecond
                           : CrossFadeState.showFirst,
-                      firstChild: _buildCover(info.musicInfo.displayImg),
+                      firstChild: _buildCover(playMusicInfo.musicInfo.displayImg),
                       secondChild: _buildLyrics(player),
                     ),
                   ),
@@ -177,7 +179,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
             child: Column(
               children: [
                 Text(
-                  FormatUtil.decodeName(info.musicInfo.name),
+                  FormatUtil.decodeName(globalPlayerStore.playMusicInfo!.musicInfo.name),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -188,7 +190,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  FormatUtil.formatSingerName(info.musicInfo.singer),
+                  FormatUtil.formatSingerName(globalPlayerStore.playMusicInfo!.musicInfo.singer),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -645,18 +647,14 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
 
   void _addToFavorite() {
     try {
-      final player = context.read<PlayerService>();
-      final info = player.playInfo;
-      if (info != null) {
-        context.read<ListStore>().addSongToList('love', info.musicInfo.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('已收藏 ♡'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 1),
-          ),
-        );
-      }
+      context.read<ListStore>().addSongToList('love', globalPlayerStore.playMusicInfo!.musicInfo.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已收藏 ♡'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 1),
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('收藏失败: $e')),
@@ -783,18 +781,18 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
               ...sources.map((src) => ListTile(
                     leading: Icon(
                       Icons.music_note,
-                      color: info.musicInfo.source == src
+                      color: globalPlayerStore.playMusicInfo!.musicInfo.source == src
                           ? Theme.of(context).colorScheme.primary
                           : null,
                     ),
                     title: Text(src.name),
                     subtitle: Text(src.id.toUpperCase()),
-                    trailing: info.musicInfo.source == src
+                    trailing: globalPlayerStore.playMusicInfo!.musicInfo.source == src
                         ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                         : null,
                     onTap: () {
                       Navigator.pop(context);
-                      _switchSource(src, info.musicInfo.name, info.musicInfo.singer);
+                      _switchSource(src, globalPlayerStore.playMusicInfo!.musicInfo.name, globalPlayerStore.playMusicInfo!.musicInfo.singer);
                     },
                   )),
               const SizedBox(height: 8),
