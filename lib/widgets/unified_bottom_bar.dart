@@ -124,13 +124,16 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 有歌曲时的底栏 — 封面 + 歌名 + 控件 + 完整导航
+  /// 有歌曲时的底栏 — 导航 | 封面+歌名 | 音乐控件居中 | 导航
   Widget _buildPlayerBar(PlayerStore store, playMusicInfo, ThemeData theme, BuildContext context) {
     final info = playMusicInfo.musicInfo;
 
     return Row(
       children: [
-        // 封面：单击播放/暂停，长按进详情
+        // 左侧导航
+        _buildCompactNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
+        _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
+        // 封面
         GestureDetector(
           onTap: () => globalPlayer.togglePlay(),
           onLongPress: () {
@@ -139,16 +142,16 @@ class UnifiedBottomBar extends StatelessWidget {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsets.only(left: 6),
             child: _AnimatedCover(
               url: info.displayImg,
               isPlaying: store.isPlay,
-              size: 40,
+              size: 36,
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        // 歌名 + 歌手
+        const SizedBox(width: 8),
+        // 歌名
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -179,7 +182,7 @@ class UnifiedBottomBar extends StatelessWidget {
             ],
           ),
         ),
-        // 播放控件
+        // 音乐控件（居中）
         IconButton(
           icon: Icon(Icons.skip_previous_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
           onPressed: () => globalPlayer.playPrevious(),
@@ -205,9 +208,7 @@ class UnifiedBottomBar extends StatelessWidget {
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           padding: EdgeInsets.zero,
         ),
-        // 全部 4 个导航图标
-        _buildCompactNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
-        _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
+        // 右侧导航
         _buildCompactNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
         _buildCompactNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
         const SizedBox(width: 4),
