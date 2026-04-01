@@ -982,7 +982,8 @@ var __mf_packages__ = {
 function __mf_require__(packageName) {
   var pkg = __mf_packages__[packageName];
   if (!pkg) throw new Error('Cannot find module: ' + packageName);
-  if (typeof pkg === 'object') pkg.default = pkg;
+  // 支持 function 和 object 两种类型的 default（axios 是 function）
+  if (typeof pkg === 'object' || typeof pkg === 'function') pkg.default = pkg;
   return pkg;
 }
 
