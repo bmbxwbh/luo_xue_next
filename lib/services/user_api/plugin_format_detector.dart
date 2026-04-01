@@ -57,6 +57,31 @@ enum MfPluginMethod {
 
   const MfPluginMethod(this.name);
   final String name;
+
+  /// 中文标签
+  String get label {
+    switch (this) {
+      case MfPluginMethod.search: return '搜索';
+      case MfPluginMethod.searchMusic: return '搜歌曲';
+      case MfPluginMethod.searchAlbum: return '搜专辑';
+      case MfPluginMethod.searchMusicSheet: return '搜歌单';
+      case MfPluginMethod.searchArtist: return '搜歌手';
+      case MfPluginMethod.searchLyric: return '搜歌词';
+      case MfPluginMethod.getMediaSource: return '播放链接';
+      case MfPluginMethod.getLyric: return '歌词';
+      case MfPluginMethod.getMusicInfo: return '歌曲信息';
+      case MfPluginMethod.getAlbumInfo: return '专辑信息';
+      case MfPluginMethod.getMusicSheetInfo: return '歌单信息';
+      case MfPluginMethod.importMusicSheet: return '导入歌单';
+      case MfPluginMethod.importMusicItem: return '导入歌曲';
+      case MfPluginMethod.getTopLists: return '排行榜';
+      case MfPluginMethod.getTopListDetail: return '排行榜详情';
+      case MfPluginMethod.getRecommendSheetTags: return '推荐歌单标签';
+      case MfPluginMethod.getRecommendSheetsByTag: return '推荐歌单';
+      case MfPluginMethod.getArtistWorks: return '歌手作品';
+      case MfPluginMethod.getMusicComments: return '评论';
+    }
+  }
 }
 
 /// MusicFree 插件元信息（从脚本中提取）

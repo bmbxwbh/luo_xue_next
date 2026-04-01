@@ -243,7 +243,13 @@ class SettingsScreen extends StatelessWidget {
               leading: const SizedBox(width: 48),
               title: Text(plugin.name, style: const TextStyle(fontSize: 14)),
               subtitle: Text(
-                plugin.methods.join(', '),
+                plugin.methods.map((m) {
+                  try {
+                    return MfPluginMethod.values.firstWhere((e) => e.name == m).label;
+                  } catch (_) {
+                    return m;
+                  }
+                }).join('、'),
                 style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               trailing: Row(
