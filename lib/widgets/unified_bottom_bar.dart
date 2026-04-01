@@ -130,7 +130,7 @@ class UnifiedBottomBar extends StatelessWidget {
 
     return Row(
       children: [
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
         // 左侧导航
         _buildCompactNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
         _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
@@ -144,7 +144,7 @@ class UnifiedBottomBar extends StatelessWidget {
             child: Icon(Icons.skip_previous_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
         // 封面 + 暂停覆盖 — 单击暂停/播放，长按进详情
         GestureDetector(
           onTap: () => globalPlayer.togglePlay(),
@@ -178,7 +178,7 @@ class UnifiedBottomBar extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
         // 下一首
         GestureDetector(
           onTap: () => globalPlayer.playNext(),
@@ -192,7 +192,7 @@ class UnifiedBottomBar extends StatelessWidget {
         // 右侧导航
         _buildCompactNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
         _buildCompactNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
       ],
     );
   }
@@ -248,7 +248,7 @@ class UnifiedBottomBar extends StatelessWidget {
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Icon(
           selected ? selectedIcon : icon,
           size: 18,
