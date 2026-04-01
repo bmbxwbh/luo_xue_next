@@ -131,6 +131,22 @@ class AboutScreen extends StatelessWidget {
             ),
           ]),
 
+          // 开发者
+          _buildSection(context, '开发者', [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                '• 半梦半醒\n'
+                '• 半浮生',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.6,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ]),
+
           // 致谢
           _buildSection(context, '致谢', [
             Padding(

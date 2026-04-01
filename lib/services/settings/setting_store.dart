@@ -6,7 +6,7 @@ import '../../models/enums.dart';
 /// 应用设置状态
 class SettingStore extends ChangeNotifier {
   // 基本设置
-  MusicSource _defaultSource = MusicSource.mg;
+  MusicSource _defaultSource = MusicSource.tx;
   String _apiHost = '';
   int _apiPort = 0;
   bool _isDarkMode = false;
@@ -251,7 +251,7 @@ class SettingStore extends ChangeNotifier {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    _defaultSource = MusicSource.fromId(prefs.getString('defaultSource') ?? 'mg');
+    _defaultSource = MusicSource.fromId(prefs.getString('defaultSource') ?? 'tx');
     _apiHost = prefs.getString('apiHost') ?? '';
     _apiPort = prefs.getInt('apiPort') ?? 0;
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
