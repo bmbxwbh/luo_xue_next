@@ -125,6 +125,8 @@ class MusicFreeRuntime {
             hasSearchMusic: typeof p.searchMusic === 'function',
             hasSearchAlbum: typeof p.searchAlbum === 'function',
             hasSearchMusicSheet: typeof p.searchMusicSheet === 'function',
+            hasSearchArtist: typeof p.searchArtist === 'function',
+            hasSearchLyric: typeof p.searchLyric === 'function',
             hasGetMediaSource: typeof p.getMediaSource === 'function',
             hasGetLyric: typeof p.getLyric === 'function',
             hasGetMusicInfo: typeof p.getMusicInfo === 'function',
@@ -136,6 +138,11 @@ class MusicFreeRuntime {
             hasGetRecommendSheetsByTag: typeof p.getRecommendSheetsByTag === 'function',
             hasGetMusicSheetInfo: typeof p.getMusicSheetInfo === 'function',
             hasGetTopListDetail: typeof p.getTopListDetail === 'function',
+            hasGetArtistWorks: typeof p.getArtistWorks === 'function',
+            hasGetMusicComments: typeof p.getMusicComments === 'function',
+            hasDefaultSearchType: p.defaultSearchType || '',
+            hasAuthor: p.author || '',
+            hasDescription: p.description || '',
             appVersion: p.appVersion || '',
             order: p.order || 0,
             cacheControl: p.cacheControl || '',
@@ -174,6 +181,8 @@ class MusicFreeRuntime {
       if (data['hasSearchMusic'] == true) methods.add(MfPluginMethod.searchMusic);
       if (data['hasSearchAlbum'] == true) methods.add(MfPluginMethod.searchAlbum);
       if (data['hasSearchMusicSheet'] == true) methods.add(MfPluginMethod.searchMusicSheet);
+      if (data['hasSearchArtist'] == true) methods.add(MfPluginMethod.searchArtist);
+      if (data['hasSearchLyric'] == true) methods.add(MfPluginMethod.searchLyric);
       if (data['hasGetMediaSource'] == true) methods.add(MfPluginMethod.getMediaSource);
       if (data['hasGetLyric'] == true) methods.add(MfPluginMethod.getLyric);
       if (data['hasGetMusicInfo'] == true) methods.add(MfPluginMethod.getMusicInfo);
@@ -185,6 +194,8 @@ class MusicFreeRuntime {
       if (data['hasGetRecommendSheetsByTag'] == true) methods.add(MfPluginMethod.getRecommendSheetsByTag);
       if (data['hasGetMusicSheetInfo'] == true) methods.add(MfPluginMethod.getMusicSheetInfo);
       if (data['hasGetTopListDetail'] == true) methods.add(MfPluginMethod.getTopListDetail);
+      if (data['hasGetArtistWorks'] == true) methods.add(MfPluginMethod.getArtistWorks);
+      if (data['hasGetMusicComments'] == true) methods.add(MfPluginMethod.getMusicComments);
 
       final meta = MfPluginMeta(
         platform: data['platform'] as String? ?? '',
@@ -501,7 +512,7 @@ class MusicFreeRuntime {
 
   /// 调用插件的 search 方法
   /// MF 原版返回: { isEnd?: boolean, data: IMusicItem[] }
-  /// Parcel 打包的插件可能用 searchMusic/searchAlbum/searchMusicSheet 替代
+  /// Parcel 打包的插件可能用 searchMusic/searchAlbum/searchMusicSheet/searchArtist/searchLyric 替代
   Future<Map<String, dynamic>> search(
     String query, int page, String type,
   ) async {
@@ -521,6 +532,12 @@ class MusicFreeRuntime {
         case 'sheet':
           methodName = 'searchMusicSheet';
           break;
+        case 'artist':
+          methodName = 'searchArtist';
+          break;
+        case 'lyric':
+          methodName = 'searchLyric';
+          break;
         default:
           methodName = 'searchMusic';
       }
@@ -539,6 +556,7 @@ class MusicFreeRuntime {
   /// 调用插件的 getMediaSource 方法
   /// 部分插件（如酷我念心、网易念心、网易 Ciallo、xiaowo）不提供 getMediaSource，
   /// 搜索结果自带 url 字段，此时直接从 musicItem 取 url
+  /// MF 原版还会检查 qualities[quality].url
   Future<Map<String, dynamic>?> getMediaSource(
     Map<String, dynamic> musicItem, String quality,
   ) async {
@@ -557,10 +575,24 @@ class MusicFreeRuntime {
       }
     }
 
-    // getMediaSource 不可用或返回空时，回退到搜索结果中的 url 字段
+    // getMediaSource 不可用或返回空时，回退：
+    // 1. 检查 qualities[quality].url（MF 原版的标准兜底）
+    final qualities = musicItem['qualities'] as Map<String, dynamic>?;
+    if (qualities != null && qualities.containsKey(quality)) {
+      final qualityInfo = qualities[quality];
+      if (qualityInfo is Map<String, dynamic>) {
+        final url = qualityInfo['url'] as String?;
+        if (url != null && url.isNotEmpty) {
+          debugPrint('[MF] getMediaSource 回退到 qualities[$quality].url');
+          return {'url': url};
+        }
+      }
+    }
+
+    // 2. 检查 musicItem.url（顶级 url 字段）
     final url = musicItem['url'] as String?;
     if (url != null && url.isNotEmpty) {
-      debugPrint('[MF] getMediaSource 回退到搜索结果 url: $url');
+      debugPrint('[MF] getMediaSource 回退到 musicItem.url');
       return {'url': url};
     }
 
@@ -569,6 +601,7 @@ class MusicFreeRuntime {
 
   /// 调用插件的 getLyric 方法
   /// 多数插件用 rawLrc，网易插件用 rawLrcTxt，统一处理
+  /// MF 原版还支持 lrc (歌词URL，已废弃但部分插件仍返回)
   Future<Map<String, dynamic>?> getLyric(Map<String, dynamic> musicItem) async {
     final result = await _callPluginMethod('getLyric', [musicItem]);
     if (result is Map) {
@@ -628,6 +661,56 @@ class MusicFreeRuntime {
     final result = await _callPluginMethod('getTopListDetail', [topListItem, page]);
     if (result is Map) return result.cast<String, dynamic>();
     return null;
+  }
+
+  /// 调用插件的 getMusicInfo 方法（通过主键查询歌曲信息）
+  Future<Map<String, dynamic>?> getMusicInfo(Map<String, dynamic> mediaBase) async {
+    final result = await _callPluginMethod('getMusicInfo', [mediaBase]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 getAlbumInfo 方法（获取专辑信息+歌曲分页）
+  Future<Map<String, dynamic>?> getAlbumInfo(Map<String, dynamic> albumItem, int page) async {
+    final result = await _callPluginMethod('getAlbumInfo', [albumItem, page]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 importMusicItem 方法（通过 URL 导入单曲）
+  Future<Map<String, dynamic>?> importMusicItem(String url) async {
+    final result = await _callPluginMethod('importMusicItem', [url]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 getArtistWorks 方法（获取歌手作品）
+  /// [type] 支持 "music" | "album"
+  Future<Map<String, dynamic>> getArtistWorks(
+    Map<String, dynamic> artistItem, int page, String type,
+  ) async {
+    final result = await _callPluginMethod('getArtistWorks', [artistItem, page, type]);
+    if (result is Map) {
+      return {
+        'isEnd': result['isEnd'] ?? true,
+        'data': ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>(),
+      };
+    }
+    return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+  }
+
+  /// 调用插件的 getMusicComments 方法（获取歌曲评论）
+  Future<Map<String, dynamic>> getMusicComments(
+    Map<String, dynamic> musicItem, int page,
+  ) async {
+    final result = await _callPluginMethod('getMusicComments', [musicItem, page]);
+    if (result is Map) {
+      return {
+        'isEnd': result['isEnd'] ?? true,
+        'data': ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>(),
+      };
+    }
+    return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
   }
 
   /// eval 包装（统一错误处理）

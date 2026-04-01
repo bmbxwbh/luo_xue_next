@@ -41,7 +41,9 @@ class MusicFreePluginInfo {
       methods.contains('search') ||
       methods.contains('searchMusic') ||
       methods.contains('searchAlbum') ||
-      methods.contains('searchMusicSheet');
+      methods.contains('searchMusicSheet') ||
+      methods.contains('searchArtist') ||
+      methods.contains('searchLyric');
   bool get supportsGetMediaSource => methods.contains('getMediaSource');
   bool get supportsGetLyric => methods.contains('getLyric');
 
@@ -401,6 +403,40 @@ class MusicFreeManager extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> importMusicSheet(String url) async {
     if (_runtime == null) return [];
     return _runtime!.importMusicSheet(url);
+  }
+
+  /// 通过主键查询歌曲信息
+  Future<Map<String, dynamic>?> getMusicInfo(Map<String, dynamic> mediaBase) async {
+    if (_runtime == null) return null;
+    return _runtime!.getMusicInfo(mediaBase);
+  }
+
+  /// 获取专辑信息
+  Future<Map<String, dynamic>?> getAlbumInfo(Map<String, dynamic> albumItem, int page) async {
+    if (_runtime == null) return null;
+    return _runtime!.getAlbumInfo(albumItem, page);
+  }
+
+  /// 通过 URL 导入单曲
+  Future<Map<String, dynamic>?> importMusicItem(String url) async {
+    if (_runtime == null) return null;
+    return _runtime!.importMusicItem(url);
+  }
+
+  /// 获取歌手作品
+  Future<Map<String, dynamic>> getArtistWorks(
+    Map<String, dynamic> artistItem, int page, String type,
+  ) async {
+    if (_runtime == null) return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+    return _runtime!.getArtistWorks(artistItem, page, type);
+  }
+
+  /// 获取歌曲评论
+  Future<Map<String, dynamic>> getMusicComments(
+    Map<String, dynamic> musicItem, int page,
+  ) async {
+    if (_runtime == null) return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+    return _runtime!.getMusicComments(musicItem, page);
   }
 
   @override

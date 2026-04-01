@@ -144,18 +144,32 @@ class OnlineMusicService {
       // MF 模式：优先使用 MF 插件获取播放链接
       if ((_pluginMode == 'musicfree' || _isFullMfMode) && _mfManager != null) {
         try {
-          // 构建 MF 格式的 musicItem
+          // 构建 MF 格式的 musicItem — 对齐 MF 原版 IMusicItem 格式
+          // 保留所有原始字段，插件可能需要 hash、copyrightId 等额外信息
+          final qualitiesMap = <String, dynamic>{};
+          for (final q in musicInfo.meta.qualitys) {
+            qualitiesMap[q.type] = {
+              if (q.size != null) 'size': q.size,
+            };
+          }
+
           final mfItem = {
             'id': songmid,
             'platform': source,
             'title': musicInfo.name,
             'artist': musicInfo.singer,
             'album': musicInfo.albumName,
-            'artwork': musicInfo.img,
+            'artwork': musicInfo.displayImg ?? musicInfo.img ?? '',
             'duration': musicInfo.intervalSec,
-            'qualities': {},
+            'qualities': qualitiesMap,
+            // 保留源特定字段（酷狗 hash、QQ strMediaMid、咪咕 copyrightId 等）
+            if (musicInfo.meta.hash != null) 'hash': musicInfo.meta.hash,
+            if (musicInfo.meta.strMediaMid != null) 'strMediaMid': musicInfo.meta.strMediaMid,
+            if (musicInfo.meta.albumMid != null) 'albumMid': musicInfo.meta.albumMid,
+            if (musicInfo.meta.copyrightId != null) 'copyrightId': musicInfo.meta.copyrightId,
+            if (musicInfo.meta.albumId != null) 'albumId': musicInfo.meta.albumId,
           };
-          // quality 映射：128k→low, 320k→standard, flac→high, flac24bit→super
+          // quality 映射：128k→low, 192k→low, 320k→standard, flac→high, flac24bit→super
           final mfQuality = _lxQualityToMf(quality.value);
 
           final result = await _mfManager!.getMediaSource(
@@ -440,14 +454,22 @@ class OnlineMusicService {
             'album': musicInfo.albumName,
             'artwork': musicInfo.img,
             'duration': musicInfo.intervalSec,
+            // 保留源特定字段
+            if (musicInfo.meta.hash != null) 'hash': musicInfo.meta.hash,
+            if (musicInfo.meta.strMediaMid != null) 'strMediaMid': musicInfo.meta.strMediaMid,
+            if (musicInfo.meta.copyrightId != null) 'copyrightId': musicInfo.meta.copyrightId,
           };
           final lyricData = await _mfManager!.getLyric(mfItem);
-          if (lyricData != null && (lyricData['rawLrc'] ?? '').toString().isNotEmpty) {
-            debugPrint('[OnlineMusic] 歌词来自MF插件 ✅');
-            return LyricInfo(
-              lyric: lyricData['rawLrc'] ?? '',
-              tlyric: lyricData['translation'],
-            );
+          if (lyricData != null) {
+            final rawLrc = lyricData['rawLrc']?.toString() ?? '';
+            final translation = lyricData['translation']?.toString();
+            if (rawLrc.isNotEmpty) {
+              debugPrint('[OnlineMusic] 歌词来自MF插件 ✅');
+              return LyricInfo(
+                lyric: rawLrc,
+                tlyric: translation,
+              );
+            }
           }
           debugPrint('[OnlineMusic] MF插件歌词为空，回退MusicSdk');
         } catch (e) {

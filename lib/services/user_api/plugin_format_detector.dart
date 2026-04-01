@@ -26,7 +26,8 @@ enum MfSearchType {
   music('music'),
   album('album'),
   artist('artist'),
-  sheet('sheet');
+  sheet('sheet'),
+  lyric('lyric');
 
   const MfSearchType(this.value);
   final String value;
@@ -38,6 +39,8 @@ enum MfPluginMethod {
   searchMusic('searchMusic'),
   searchAlbum('searchAlbum'),
   searchMusicSheet('searchMusicSheet'),
+  searchArtist('searchArtist'),
+  searchLyric('searchLyric'),
   getMediaSource('getMediaSource'),
   getLyric('getLyric'),
   getMusicInfo('getMusicInfo'),
@@ -48,7 +51,9 @@ enum MfPluginMethod {
   getTopLists('getTopLists'),
   getTopListDetail('getTopListDetail'),
   getRecommendSheetTags('getRecommendSheetTags'),
-  getRecommendSheetsByTag('getRecommendSheetsByTag');
+  getRecommendSheetsByTag('getRecommendSheetsByTag'),
+  getArtistWorks('getArtistWorks'),
+  getMusicComments('getMusicComments');
 
   const MfPluginMethod(this.name);
   final String name;
@@ -67,6 +72,12 @@ class MfPluginMeta {
 
   /// 兼容 app 版本
   final String? appVersion;
+
+  /// 插件作者
+  final String? author;
+
+  /// 插件描述
+  final String? description;
 
   /// 支持的搜索类型
   final List<MfSearchType> supportedSearchType;
@@ -94,6 +105,8 @@ class MfPluginMeta {
     this.version,
     this.srcUrl,
     this.appVersion,
+    this.author,
+    this.description,
     this.supportedSearchType = const [],
     this.cacheControl,
     this.userVariables,
@@ -142,6 +155,8 @@ class MfPluginMeta {
         if (version != null) 'version': version,
         if (srcUrl != null) 'srcUrl': srcUrl,
         if (appVersion != null) 'appVersion': appVersion,
+        if (author != null) 'author': author,
+        if (description != null) 'description': description,
         'supportedSearchType':
             supportedSearchType.map((t) => t.value).toList(),
         if (cacheControl != null) 'cacheControl': cacheControl,
@@ -258,6 +273,8 @@ MfPluginMeta? _detectMusicFree(String script) {
   final srcUrl = _extractStringField(script, 'srcUrl');
   final appVersion = _extractStringField(script, 'appVersion');
   final cacheControl = _extractStringField(script, 'cacheControl');
+  final author = _extractStringField(script, 'author');
+  final description = _extractStringField(script, 'description');
 
   // 提取 supportedSearchType
   final supportedSearchType = _extractSearchTypes(script);
@@ -273,6 +290,8 @@ MfPluginMeta? _detectMusicFree(String script) {
     version: version,
     srcUrl: srcUrl,
     appVersion: appVersion,
+    author: author,
+    description: description,
     supportedSearchType: supportedSearchType,
     cacheControl: cacheControl,
     userVariables: userVariables,
