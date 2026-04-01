@@ -414,15 +414,28 @@ class MusicFreeRuntime {
   /// 处理 HTTP 请求事件
   Future<void> _handleHttpRequest(Map<String, dynamic> data) async {
     final requestKey = data['requestKey'] as String?;
+    final url = data['url'] as String? ?? '';
     final options = data['options'] as Map<String, dynamic>?;
-    if (requestKey == null || options == null) return;
 
-    final url = options['url'] as String? ?? '';
+    debugPrint('[MF] HTTP 收到请求: key=$requestKey, url=$url, options=$options');
+    if (requestKey == null || options == null) {
+      debugPrint('[MF] HTTP 请求缺少关键字段，跳过');
+      return;
+    }
+
     final method = (options['method'] as String? ?? 'GET').toUpperCase();
     final headers = (options['headers'] as Map<String, dynamic>?)?.cast<String, String>() ?? {};
     final body = options['body'];
     final timeoutRaw = options['timeout'];
     final timeout = timeoutRaw is int ? timeoutRaw : (timeoutRaw is num ? timeoutRaw.toInt() : 15000);
+
+    if (url.isEmpty) {
+      debugPrint('[MF] HTTP URL 为空，返回错误');
+      final errJson = jsonEncode({'requestKey': requestKey, 'error': 'URL is empty', 'response': null});
+      final errBase64 = base64Encode(utf8.encode(errJson));
+      _eval("handleMfNativeResponse(JSON.parse(atob('$errBase64')));");
+      return;
+    }
 
     debugPrint('[MF] HTTP $method $url (timeout: ${timeout}ms)');
 

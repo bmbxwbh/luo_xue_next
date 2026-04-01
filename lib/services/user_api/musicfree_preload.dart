@@ -431,6 +431,48 @@ function __mf_aes_cbc_decrypt__(ciphertext, password) {
   try { return decodeURIComponent(escape(result)); } catch(e) { return result; }
 }
 
+// ===================== atob / btoa Polyfill =====================
+// QuickJS 没有内置 atob/btoa，用纯 JS 实现
+var __mf_b64chars__ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+if (typeof btoa === 'undefined') {
+  var btoa = function(str) {
+    var out = '';
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charCodeAt(i);
+      if (c < 128) { out += String.fromCharCode(c); }
+      else if (c < 2048) { out += String.fromCharCode(192 | c >> 6, 128 | c & 63); }
+      else { out += String.fromCharCode(224 | c >> 12, 128 | (c >> 6) & 63, 128 | c & 63); }
+    }
+    var result = '';
+    for (var i = 0; i < out.length; i += 3) {
+      var a = out.charCodeAt(i);
+      var b = i + 1 < out.length ? out.charCodeAt(i + 1) : 0;
+      var c = i + 2 < out.length ? out.charCodeAt(i + 2) : 0;
+      result += __mf_b64chars__.charAt(a >> 2);
+      result += __mf_b64chars__.charAt(((a & 3) << 4) | (b >> 4));
+      result += i + 1 < out.length ? __mf_b64chars__.charAt(((b & 15) << 2) | (c >> 6)) : '=';
+      result += i + 2 < out.length ? __mf_b64chars__.charAt(c & 63) : '=';
+    }
+    return result;
+  };
+}
+if (typeof atob === 'undefined') {
+  var atob = function(str) {
+    str = str.replace(/[^A-Za-z0-9+\/=]/g, '');
+    var out = '';
+    for (var i = 0; i < str.length; i += 4) {
+      var a = __mf_b64chars__.indexOf(str.charAt(i));
+      var b = __mf_b64chars__.indexOf(str.charAt(i + 1));
+      var c = __mf_b64chars__.indexOf(str.charAt(i + 2));
+      var d = __mf_b64chars__.indexOf(str.charAt(i + 3));
+      out += String.fromCharCode((a << 2) | (b >> 4));
+      if (str.charAt(i + 2) !== '=') out += String.fromCharCode(((b & 15) << 4) | (c >> 2));
+      if (str.charAt(i + 3) !== '=') out += String.fromCharCode(((c & 3) << 6) | d);
+    }
+    return out;
+  };
+}
+
 var __mf_CryptoJS__ = {
   MD5: function(msg) {
     var str = (typeof msg === 'object' && msg !== null) ? __mf_utf8_to_str__(msg) : String(msg);
