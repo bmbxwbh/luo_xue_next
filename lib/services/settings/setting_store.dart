@@ -40,6 +40,7 @@ class SettingStore extends ChangeNotifier {
   bool _isAutoCleanPlayedList = false; // 自动清理已播放列表
   bool _disclaimerAccepted = false; // 免责协议已同意
   bool _isFullMfMode = false; // 完整 MF 插件模式（所有源功能走 MF 插件）
+  bool _mfCompatibilityMode = true; // MF 兼容模式（从 console.log 拦截 URL）
 
   final Completer<void> _initCompleter = Completer<void>();
   bool _initialized = false;
@@ -90,6 +91,7 @@ class SettingStore extends ChangeNotifier {
   bool get isAutoCleanPlayedList => _isAutoCleanPlayedList;
   bool get disclaimerAccepted => _disclaimerAccepted;
   bool get isFullMfMode => _isFullMfMode;
+  bool get mfCompatibilityMode => _mfCompatibilityMode;
 
   void setDefaultSource(MusicSource v) {
     _defaultSource = v;
@@ -237,6 +239,11 @@ class SettingStore extends ChangeNotifier {
     _saveAndNotify();
   }
 
+  void setMfCompatibilityMode(bool v) {
+    _mfCompatibilityMode = v;
+    _saveAndNotify();
+  }
+
   void _saveAndNotify() {
     notifyListeners();
     _saveSettings();
@@ -270,6 +277,7 @@ class SettingStore extends ChangeNotifier {
     _isAutoCleanPlayedList = prefs.getBool('isAutoCleanPlayedList') ?? false;
     _disclaimerAccepted = prefs.getBool('disclaimerAccepted') ?? false;
     _isFullMfMode = prefs.getBool('isFullMfMode') ?? false;
+    _mfCompatibilityMode = prefs.getBool('mfCompatibilityMode') ?? true;
     _initialized = true;
     if (!_initCompleter.isCompleted) _initCompleter.complete();
     notifyListeners();
@@ -303,5 +311,6 @@ class SettingStore extends ChangeNotifier {
     await prefs.setBool('isAutoCleanPlayedList', _isAutoCleanPlayedList);
     await prefs.setBool('disclaimerAccepted', _disclaimerAccepted);
     await prefs.setBool('isFullMfMode', _isFullMfMode);
+    await prefs.setBool('mfCompatibilityMode', _mfCompatibilityMode);
   }
 }

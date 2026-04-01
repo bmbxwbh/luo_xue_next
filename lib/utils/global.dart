@@ -46,6 +46,11 @@ void initGlobalPlayer({
   // 同步完整 MF 插件模式
   globalOnlineMusicService.setIsFullMfMode(settingStore.isFullMfMode);
 
+  // 同步 MF 兼容模式
+  if (musicFreeManager != null) {
+    musicFreeManager.setCompatibilityMode(settingStore.mfCompatibilityMode);
+  }
+
   // 同步插件模式（lx / musicfree）
   SharedPreferences.getInstance().then((prefs) {
     final savedMode = prefs.getString('plugin_mode') ?? 'lx';

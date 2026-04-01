@@ -439,6 +439,13 @@ class MusicFreeManager extends ChangeNotifier {
     return _runtime!.getMusicComments(musicItem, page);
   }
 
+  /// 设置兼容模式（从 console.log 拦截 URL）
+  void setCompatibilityMode(bool enabled) {
+    if (_runtime != null) {
+      _runtime!.compatibilityMode = enabled;
+    }
+  }
+
   @override
   void dispose() {
     _runtime?.dispose();

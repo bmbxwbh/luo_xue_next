@@ -318,6 +318,24 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
           ),
+        // 兼容模式开关
+        if (hasMfPlugin)
+          Consumer<SettingStore>(
+            builder: (ctx, setting, _) => SwitchListTile(
+              dense: true,
+              secondary: const SizedBox(width: 48),
+              title: const Text('兼容模式', style: TextStyle(fontSize: 14)),
+              subtitle: const Text(
+                '从插件日志中提取播放 URL（部分插件需要）',
+                style: TextStyle(fontSize: 11),
+              ),
+              value: setting.mfCompatibilityMode,
+              onChanged: (v) {
+                setting.setMfCompatibilityMode(v);
+                globalMusicFreeManager.setCompatibilityMode(v);
+              },
+            ),
+          ),
       ],
     );
   }
