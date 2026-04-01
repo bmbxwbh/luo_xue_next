@@ -29,7 +29,7 @@
 - 或者有 flutter_js / JavaScriptCore 深度使用经验的朋友能帮忙排查环境差异
 - 哪怕只是提供排查思路，对我们来说都非常宝贵
 
-联系方式：直接提 [Issue](https://github.com/bmbxwbh/luo_xue_next/issues) 就好，或者加群交流。我们虽然是两个人的小团队，但态度是认真的，你提的问题我们一定第一时间响应。
+联系方式：直接提 [Issue](https://github.com/bmbxwbh/luo_xue_next/issues) 就好。我们虽然是两个人的小团队，但态度是认真的，你提的问题我们一定第一时间响应。
 
 **感谢每一个看到这里的人 ❤️**
 
