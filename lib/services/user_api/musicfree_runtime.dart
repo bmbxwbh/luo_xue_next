@@ -601,12 +601,36 @@ class MusicFreeRuntime {
 
     // 先尝试调用插件的 getMediaSource
     if (currentPlugin?.meta.methods.contains(MfPluginMethod.getMediaSource) == true) {
-      final result = await _callPluginMethod('getMediaSource', [musicItem, quality]);
+      dynamic result;
 
-      // 兼容模式：如果 Promise 超时/失败但拦截到了 URL，直接用拦截的 URL
-      if (result == null && compatibilityMode && _lastInterceptedUrl != null) {
-        debugPrint('[MF] 兼容模式：使用拦截 URL = $_lastInterceptedUrl');
-        return {'url': _lastInterceptedUrl};
+      if (compatibilityMode) {
+        // 兼容模式：竞速 — 插件调用 vs 拦截 URL
+        // 每 100ms 检查一次拦截 URL，一旦出现立即返回
+        final interceptedFuture = _waitForInterceptedUrl(
+          timeout: const Duration(seconds: 15),
+        );
+        final pluginFuture = _callPluginMethod('getMediaSource', [musicItem, quality]);
+
+        final raceResult = await Future.any([
+          pluginFuture,
+          interceptedFuture,
+        ]);
+
+        if (raceResult is String && raceResult.isNotEmpty) {
+          // 拦截 URL 先到
+          debugPrint('[MF] 兼容模式：拦截 URL 竞速获胜 = $raceResult');
+          return {'url': raceResult};
+        }
+        // 插件调用先完成
+        result = raceResult;
+
+        // 插件调用失败但有拦截 URL
+        if (result == null && _lastInterceptedUrl != null) {
+          debugPrint('[MF] 兼容模式：使用拦截 URL = $_lastInterceptedUrl');
+          return {'url': _lastInterceptedUrl};
+        }
+      } else {
+        result = await _callPluginMethod('getMediaSource', [musicItem, quality]);
       }
 
       if (result is Map) {
@@ -642,6 +666,21 @@ class MusicFreeRuntime {
       return {'url': url};
     }
 
+    return null;
+  }
+
+  /// 等待拦截 URL 出现（每 100ms 检查一次）
+  /// 返回拦截到的 URL，超时返回 null
+  Future<String?> _waitForInterceptedUrl({required Duration timeout}) async {
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      final url = _lastInterceptedUrl;
+      if (url != null && url.isNotEmpty) {
+        _lastInterceptedUrl = null; // 消费掉
+        return url;
+      }
+    }
     return null;
   }
 
