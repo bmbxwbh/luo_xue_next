@@ -986,6 +986,76 @@ function __mf_require__(packageName) {
   return pkg;
 }
 
+// ===================== MF URL Polyfill =====================
+var URL = (function() {
+  function URL(url, base) {
+    if (base) {
+      // 简单的 base + relative 合并
+      if (url.indexOf('://') > 0) {
+        this._parse(url);
+        return;
+      }
+      var b = new URL(base);
+      if (url.charAt(0) === '/') {
+        this._parse(b.protocol + '//' + b.host + url);
+      } else {
+        var basePath = b.pathname.replace(/\/[^\/]*$/, '');
+        this._parse(b.protocol + '//' + b.host + basePath + '/' + url);
+      }
+    } else {
+      this._parse(url);
+    }
+  }
+  URL.prototype._parse = function(href) {
+    this.href = href;
+    var m = href.match(/^([a-z][a-z0-9+.-]*:)?(\/\/([^\/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$/i);
+    this.protocol = (m && m[1]) || '';
+    this.host = (m && m[3]) || '';
+    this.hostname = this.host.replace(/:\d+$/, '');
+    this.port = (this.host.match(/:(\d+)$/) || [])[1] || '';
+    this.pathname = (m && m[4]) || '/';
+    this.search = (m && m[5]) || '';
+    this.hash = (m && m[7]) || '';
+    this.origin = this.protocol + '//' + this.host;
+  };
+  URL.prototype.toString = function() { return this.href; };
+  URL.createObjectURL = function() { return ''; };
+  URL.revokeObjectURL = function() {};
+  return URL;
+})();
+
+var URLSearchParams = (function() {
+  function URLSearchParams(init) {
+    this._params = [];
+    if (typeof init === 'string') {
+      init = init.replace(/^\?/, '');
+      var pairs = init.split('&');
+      for (var i = 0; i < pairs.length; i++) {
+        var kv = pairs[i].split('=');
+        if (kv[0]) this._params.push([decodeURIComponent(kv[0]), decodeURIComponent(kv[1] || '')]);
+      }
+    }
+  }
+  URLSearchParams.prototype.get = function(k) {
+    for (var i = 0; i < this._params.length; i++) {
+      if (this._params[i][0] === k) return this._params[i][1];
+    }
+    return null;
+  };
+  URLSearchParams.prototype.getAll = function(k) {
+    var r = [];
+    for (var i = 0; i < this._params.length; i++) {
+      if (this._params[i][0] === k) r.push(this._params[i][1]);
+    }
+    return r;
+  };
+  URLSearchParams.prototype.has = function(k) { return this.get(k) !== null; };
+  URLSearchParams.prototype.toString = function() {
+    return this._params.map(function(p) { return encodeURIComponent(p[0]) + '=' + encodeURIComponent(p[1]); }).join('&');
+  };
+  return URLSearchParams;
+})();
+
 // ===================== MF console 桥接 =====================
 var __mf_console__ = {
   log: function() {
