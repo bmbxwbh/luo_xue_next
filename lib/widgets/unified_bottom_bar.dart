@@ -130,6 +130,7 @@ class UnifiedBottomBar extends StatelessWidget {
 
     return Row(
       children: [
+        const SizedBox(width: 4),
         // 左侧导航
         _buildCompactNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
         _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
