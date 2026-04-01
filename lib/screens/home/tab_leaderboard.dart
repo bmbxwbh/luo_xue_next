@@ -14,7 +14,8 @@ import '../../widgets/song_list_tile.dart';
 /// 排行榜 Tab — 真实数据版
 class TabLeaderboard extends StatefulWidget {
   final MusicSource source;
-  const TabLeaderboard({super.key, required this.source});
+  final int sourceVersion;
+  const TabLeaderboard({super.key, required this.source, this.sourceVersion = 0});
 
   @override
   State<TabLeaderboard> createState() => _TabLeaderboardState();
@@ -39,7 +40,7 @@ class _TabLeaderboardState extends State<TabLeaderboard> {
   @override
   void didUpdateWidget(TabLeaderboard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.source != widget.source) {
+    if (oldWidget.source != widget.source || oldWidget.sourceVersion != widget.sourceVersion) {
       _source = widget.source;
       _loadBoards();
     }

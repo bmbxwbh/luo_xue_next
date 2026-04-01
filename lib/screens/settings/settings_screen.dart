@@ -261,6 +261,7 @@ class SettingsScreen extends StatelessWidget {
                     icon: const Icon(Icons.delete_outline, size: 18),
                     onPressed: () async {
                       await mfManager.removePlugin(plugin.id);
+                      bumpSourceVersion();
                     },
                   ),
                 ],
@@ -268,6 +269,7 @@ class SettingsScreen extends StatelessWidget {
               onTap: () async {
                 try {
                   await mfManager.setActivePlugin(plugin.id);
+                  bumpSourceVersion();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('✅ ${plugin.name} 已激活')),

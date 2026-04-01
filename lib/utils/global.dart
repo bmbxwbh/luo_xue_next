@@ -24,6 +24,14 @@ late final OnlineMusicService globalOnlineMusicService;
 /// MusicFree 插件管理器
 late final MusicFreeManager globalMusicFreeManager;
 
+/// 音源/模式版本号 — 递增触发页面刷新
+int globalSourceVersion = 0;
+
+/// 递增音源版本号（音源/模式/插件切换时调用）
+void bumpSourceVersion() {
+  globalSourceVersion++;
+}
+
 /// 初始化全局播放器
 void initGlobalPlayer({
   required SettingStore settingStore,

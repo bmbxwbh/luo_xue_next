@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/enums.dart';
 import '../../services/settings/setting_store.dart';
 import '../../services/user_api/musicfree_manager.dart';
+import '../../utils/global.dart';
 import 'tab_songlist.dart';
 import 'tab_leaderboard.dart';
 
@@ -98,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen>
                       onSelected: (_) {
                         setState(() => _source = src);
                         context.read<SettingStore>().setDefaultSource(src);
+                        bumpSourceVersion();
                         Navigator.pop(context);
                       },
                     );
@@ -249,8 +251,8 @@ class _HomeScreenState extends State<HomeScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  TabSongList(source: _source),
-                  TabLeaderboard(source: _source),
+                  TabSongList(source: _source, sourceVersion: globalSourceVersion),
+                  TabLeaderboard(source: _source, sourceVersion: globalSourceVersion),
                 ],
               ),
             ),

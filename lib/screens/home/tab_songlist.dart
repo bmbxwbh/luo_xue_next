@@ -20,7 +20,8 @@ const int _pageSize = 18;
 /// 推荐歌单 Tab
 class TabSongList extends StatefulWidget {
   final MusicSource source;
-  const TabSongList({super.key, required this.source});
+  final int sourceVersion;
+  const TabSongList({super.key, required this.source, this.sourceVersion = 0});
 
   @override
   State<TabSongList> createState() => _TabSongListState();
@@ -48,7 +49,7 @@ class _TabSongListState extends State<TabSongList> {
   @override
   void didUpdateWidget(TabSongList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.source != widget.source) {
+    if (oldWidget.source != widget.source || oldWidget.sourceVersion != widget.sourceVersion) {
       _source = widget.source;
       _category = '全部';
       _categoryTagId = null;

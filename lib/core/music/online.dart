@@ -4,6 +4,7 @@ import '../../models/enums.dart';
 import '../../models/song_model.dart';
 import '../../models/lyric_info.dart';
 import '../../utils/http_client.dart';
+import '../../utils/global.dart';
 import '../../music_sdk/index.dart';
 import '../../services/user_api/user_api_manager.dart';
 import '../../services/user_api/musicfree_manager.dart';
@@ -47,11 +48,13 @@ class OnlineMusicService {
   /// 设置插件模式
   void setPluginMode(String mode) {
     _pluginMode = mode;
+    bumpSourceVersion();
   }
 
   /// 设置完整 MF 插件模式
   void setIsFullMfMode(bool enabled) {
     _isFullMfMode = enabled;
+    bumpSourceVersion();
   }
 
   /// 是否处于 MF 模式且有可用搜索插件
