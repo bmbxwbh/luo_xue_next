@@ -460,7 +460,7 @@ class MusicFreeRuntime {
         respHeaders[name] = values.join(', ');
       });
 
-      // 注入响应到 JS
+      // 注入响应到 JS（base64 编码避免转义问题）
       debugPrint('[MF] HTTP 响应: $method $url → $statusCode (${responseBody.length} bytes)');
       final respJson = jsonEncode({
         'requestKey': requestKey,
@@ -472,8 +472,8 @@ class MusicFreeRuntime {
           'body': responseBody,
         }
       });
-      final escapedResp = respJson.replaceAll("'", "\\'");
-      _eval("handleMfNativeResponse(JSON.parse('$escapedResp'));");
+      final respBase64 = base64Encode(utf8.encode(respJson));
+      _eval("handleMfNativeResponse(JSON.parse(atob('$respBase64')));");
 
       client.close();
     } catch (e) {
@@ -483,8 +483,8 @@ class MusicFreeRuntime {
         'error': e.toString(),
         'response': null,
       });
-      final escapedErr = errJson.replaceAll("'", "\\'");
-      _eval("handleMfNativeResponse(JSON.parse('$escapedErr'));");
+      final errBase64 = base64Encode(utf8.encode(errJson));
+      _eval("handleMfNativeResponse(JSON.parse(atob('$errBase64')));");
     }
   }
 
