@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../services/player/player_service.dart';
 import '../../services/settings/setting_store.dart';
 import '../../services/music/list_store.dart';
 import '../../store/player_store.dart';
@@ -65,7 +64,6 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
   @override
   Widget build(BuildContext context) {
     final store = context.watch<PlayerStore>();
-    final player = context.watch<PlayerService>();
     final playMusicInfo = store.playMusicInfo;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -104,7 +102,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
             child: SafeArea(
               child: Column(
                 children: [
-                  _buildAppBar(player, playMusicInfo),
+                  _buildAppBar(playMusicInfo),
                   // 主内容区（封面/歌词交叉淡入淡出）
                   Expanded(
                     child: AnimatedCrossFade(
@@ -114,10 +112,10 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                           ? CrossFadeState.showSecond
                           : CrossFadeState.showFirst,
                       firstChild: _buildCover(playMusicInfo.musicInfo.displayImg),
-                      secondChild: _buildLyrics(player),
+                      secondChild: _buildLyrics(),
                     ),
                   ),
-                  _buildControls(player),
+                  _buildControls(),
                 ],
               ),
             ),
@@ -166,7 +164,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
     );
   }
 
-  Widget _buildAppBar(PlayerService player, PlayMusicInfo info) {
+  Widget _buildAppBar(PlayMusicInfo info) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Row(
@@ -204,7 +202,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
           IconButton(
             icon: const Icon(Icons.swap_horiz),
             tooltip: '换源',
-            onPressed: () => _showSourceSwitcher(player, info),
+            onPressed: () => _showSourceSwitcher(info),
           ),
           IconButton(
             icon: const Icon(Icons.more_horiz),
@@ -316,7 +314,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
     );
   }
 
-  Widget _buildLyrics(PlayerService player) {
+  Widget _buildLyrics() {
     final colorScheme = Theme.of(context).colorScheme;
     final musicInfo = globalPlayerStore.musicInfo;
     final lyricInfo = LyricInfo(
@@ -326,7 +324,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
       lxlyric: musicInfo.lxlyric,
     );
     final lines = lyricInfo.parseLrc();
-    final currentPos = player.position.inMilliseconds / 1000.0;
+    final currentPos = globalPlayerStore.progress.nowPlayTime;
 
     if (lines.isEmpty) {
       return GestureDetector(
@@ -419,8 +417,9 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
     );
   }
 
-  Widget _buildControls(PlayerService player) {
+  Widget _buildControls() {
     final colorScheme = Theme.of(context).colorScheme;
+    final progress = globalPlayerStore.progress;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
@@ -435,7 +434,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                 SizedBox(
                   width: 40,
                   child: Text(
-                    player.positionStr,
+                    progress.nowPlayTimeStr,
                     style: TextStyle(
                       fontSize: 11,
                       color: colorScheme.onSurfaceVariant,
@@ -459,15 +458,20 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                       thumbColor: colorScheme.primary,
                     ),
                     child: Slider(
-                      value: player.progress.clamp(0.0, 1.0),
-                      onChanged: (v) => player.seekTo(v),
+                      value: progress.progress.clamp(0.0, 1.0),
+                      onChanged: (v) {
+                        final maxMs = progress.maxPlayTime;
+                        if (maxMs > 0) {
+                          globalPlayer.seekTo(Duration(milliseconds: (maxMs * v * 1000).round()));
+                        }
+                      },
                     ),
                   ),
                 ),
                 SizedBox(
                   width: 40,
                   child: Text(
-                    player.durationStr,
+                    progress.maxPlayTimeStr,
                     textAlign: TextAlign.right,
                     style: TextStyle(
                       fontSize: 11,
@@ -486,19 +490,19 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
             children: [
               // 播放模式
               _buildControlBtn(
-                icon: _playModeIcon(player.playMode),
+                icon: _playModeIcon(globalSettingStore.playMode),
                 size: 24,
-                onTap: () => player.togglePlayMode(),
+                onTap: () => globalPlayer.togglePlayMode(),
               ),
               // 上一首
               _buildControlBtn(
                 icon: Icons.skip_previous_rounded,
                 size: 32,
-                onTap: () => player.playPrev(),
+                onTap: () => globalPlayer.playPrevious(),
               ),
               // 播放/暂停 — 主按钮
               GestureDetector(
-                onTap: () => player.togglePlay(),
+                onTap: () => globalPlayer.togglePlay(),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: 60,
@@ -524,8 +528,8 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     child: Icon(
-                      player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      key: ValueKey(player.isPlaying),
+                      globalPlayerStore.isPlay ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      key: ValueKey(globalPlayerStore.isPlay),
                       size: 32,
                       color: colorScheme.onPrimary,
                     ),
@@ -536,7 +540,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
               _buildControlBtn(
                 icon: Icons.skip_next_rounded,
                 size: 32,
-                onTap: () => player.playNext(),
+                onTap: () => globalPlayer.playNext(),
               ),
               // 播放列表
               _buildControlBtn(
@@ -553,11 +557,11 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
             children: [
               IconButton(
                 icon: Icon(
-                  _playModeIcon(player.playMode),
+                  _playModeIcon(globalSettingStore.playMode),
                   size: 24,
                   color: colorScheme.onSurfaceVariant,
                 ),
-                onPressed: () => player.togglePlayMode(),
+                onPressed: () => globalPlayer.togglePlayMode(),
               ),
               IconButton(
                 icon: Icon(
@@ -747,7 +751,7 @@ class _PlayDetailScreenState extends State<PlayDetailScreen>
     );
   }
 
-  void _showSourceSwitcher(PlayerService player, PlayMusicInfo info) {
+  void _showSourceSwitcher(PlayMusicInfo info) {
     final sources = MusicSource.values.where((s) => s.id != 'local').toList();
     showModalBottomSheet(
       context: context,
