@@ -153,6 +153,14 @@ function __mf_hex_from_words__(wa) {
   return hex.substr(0, wa.sigBytes * 2);
 }
 
+function __mf_hex_to_bytes__(hex) {
+  var bytes = [];
+  for (var i = 0; i < hex.length; i += 2) {
+    bytes.push(parseInt(hex.substr(i, 2), 16));
+  }
+  return bytes;
+}
+
 function __mf_utf8_to_str__(wa) {
   var hex = __mf_hex_from_words__(wa);
   var str = '';
@@ -374,14 +382,24 @@ function __mf_aes_decrypt_block__(input, w) {
   for (var j=0;j<4;j++) for (var i=0;i<4;i++) out.push(s[i][j]);
   return out;
 }
-function __mf_aes_encrypt_bytes__(data, keyBytes) {
+function __mf_aes_encrypt_bytes__(data, keyBytes, ivBytes) {
   var nk = keyBytes.length / 4;
   var w = __mf_aes_key_exp__(keyBytes);
   var pad = 16 - (data.length % 16);
   var padded = data.slice();
   for (var i = 0; i < pad; i++) padded.push(pad);
   var out = [];
-  for (var i = 0; i < padded.length; i += 16) out = out.concat(__mf_aes_encrypt_block__(padded.slice(i, i+16), w));
+  var prev = ivBytes || [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]; // IV 或全零（ECB 兼容）
+  for (var i = 0; i < padded.length; i += 16) {
+    var block = padded.slice(i, i+16);
+    // CBC: XOR with previous ciphertext (or IV)
+    if (ivBytes) {
+      for (var j = 0; j < 16; j++) block[j] ^= prev[j];
+    }
+    var encrypted = __mf_aes_encrypt_block__(block, w);
+    out = out.concat(encrypted);
+    prev = encrypted;
+  }
   return out;
 }
 function __mf_aes_decrypt_bytes__(data, keyBytes) {
@@ -409,11 +427,23 @@ function __mf_random_bytes__(n) {
   for (var i = 0; i < n; i++) a.push(Math.floor(Math.random() * 256));
   return a;
 }
-function __mf_aes_cbc_encrypt__(plaintext, password) {
+function __mf_aes_cbc_encrypt__(plaintext, password, customIv) {
   var pBytes = []; for (var i = 0; i < plaintext.length; i++) pBytes.push(plaintext.charCodeAt(i));
+  var ivHex;
+  if (customIv) {
+    // 自定义 IV：传入的是字符串（如 "0102030405060708"），转为 hex
+    ivHex = '';
+    for (var i = 0; i < customIv.length; i++) ivHex += ('0' + customIv.charCodeAt(i).toString(16)).slice(-2);
+  }
   var salt = String.fromCharCode.apply(null, __mf_random_bytes__(8));
   var kv = __mf_openssl_bytes_to_key__(password, salt, 16, 16);
-  var encrypted = __mf_aes_encrypt_bytes__(pBytes, kv.key);
+  var iv = customIv ? __mf_hex_to_bytes__(ivHex) : kv.iv;
+  var encrypted = __mf_aes_encrypt_bytes__(pBytes, kv.key, iv);
+  if (customIv) {
+    // 自定义 IV：不加 Salted__ 前缀，直接返回密文的 base64
+    var bin = ''; for (var i = 0; i < encrypted.length; i++) bin += String.fromCharCode(encrypted[i]);
+    return btoa(bin);
+  }
   var result = [83,97,108,116,101,100,95,95];
   for (var i = 0; i < salt.length; i++) result.push(salt.charCodeAt(i));
   result = result.concat(encrypted);
@@ -495,10 +525,15 @@ var __mf_CryptoJS__ = {
     return __mf_hmac_sha256__(m, k);
   },
   AES: {
-    encrypt: function(msg, key) {
+    encrypt: function(msg, key, options) {
       var m = (typeof msg === 'object' && msg !== null) ? __mf_utf8_to_str__(msg) : String(msg);
       var k = (typeof key === 'object' && key !== null) ? __mf_hex_from_words__(key) : String(key);
-      var b64 = __mf_aes_cbc_encrypt__(m, k);
+      // 支持自定义 IV（网易 weapi 等需要）
+      var iv = null;
+      if (options && options.iv) {
+        iv = (typeof options.iv === 'object' && options.iv !== null) ? __mf_hex_from_words__(options.iv) : String(options.iv);
+      }
+      var b64 = __mf_aes_cbc_encrypt__(m, k, iv);
       return { ciphertext: b64, toString: function(enc) { return b64; } };
     },
     decrypt: function(ciphertext, key) {
