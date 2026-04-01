@@ -124,7 +124,7 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 有歌曲时的底栏 — 封面 + 歌名 + 控件 + 导航
+  /// 有歌曲时的底栏 — 封面 + 歌名 + 控件 + 完整导航
   Widget _buildPlayerBar(PlayerStore store, playMusicInfo, ThemeData theme, BuildContext context) {
     final info = playMusicInfo.musicInfo;
 
@@ -205,7 +205,9 @@ class UnifiedBottomBar extends StatelessWidget {
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           padding: EdgeInsets.zero,
         ),
-        // 导航图标（紧凑排列）
+        // 全部 4 个导航图标
+        _buildCompactNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
+        _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
         _buildCompactNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
         _buildCompactNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
         const SizedBox(width: 4),
