@@ -77,6 +77,12 @@ class MusicFreeRuntime {
   /// 自增 Promise ID
   int _promiseIdCounter = 0;
 
+  /// 兼容模式：从 console.log 中拦截 URL，跳过 getMediaSource Promise
+  bool compatibilityMode = true;
+
+  /// 从 console.log 拦截到的最近 URL
+  String? _lastInterceptedUrl;
+
   MusicFreePlugin? get currentPlugin => _currentPlugin;
   bool get isInitialized => _initialized && _currentPlugin != null;
 
@@ -400,7 +406,16 @@ class MusicFreeRuntime {
           } else if (action == 'mf_crypto') {
             _handleCryptoRequest(data);
           } else if (action == '__log__') {
-            debugPrint('[MF Plugin] ${data['msg']}');
+            final msg = data['msg']?.toString() ?? '';
+            debugPrint('[MF Plugin] $msg');
+            // 兼容模式：拦截包含 http(s):// 的日志，提取 URL
+            if (compatibilityMode) {
+              final urlMatch = RegExp(r'(https?://[^\s,}\]]+)').firstMatch(msg);
+              if (urlMatch != null) {
+                _lastInterceptedUrl = urlMatch.group(1);
+                debugPrint('[MF] 兼容模式拦截 URL: $_lastInterceptedUrl');
+              }
+            }
           }
         }
       }
@@ -581,9 +596,19 @@ class MusicFreeRuntime {
   Future<Map<String, dynamic>?> getMediaSource(
     Map<String, dynamic> musicItem, String quality,
   ) async {
+    // 兼容模式：先清空拦截 URL
+    _lastInterceptedUrl = null;
+
     // 先尝试调用插件的 getMediaSource
     if (currentPlugin?.meta.methods.contains(MfPluginMethod.getMediaSource) == true) {
       final result = await _callPluginMethod('getMediaSource', [musicItem, quality]);
+
+      // 兼容模式：如果 Promise 超时/失败但拦截到了 URL，直接用拦截的 URL
+      if (result == null && compatibilityMode && _lastInterceptedUrl != null) {
+        debugPrint('[MF] 兼容模式：使用拦截 URL = $_lastInterceptedUrl');
+        return {'url': _lastInterceptedUrl};
+      }
+
       if (result is Map) {
         final url = result['url'] as String?;
         if (url != null && url.isNotEmpty) {
