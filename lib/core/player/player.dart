@@ -44,11 +44,20 @@ class Player {
     _playInfoManager = PlayInfoManager(_playerStore);
     _progressManager = ProgressManager(_playerStore, _audioPlayer);
 
-    // 监听播放完成事件
+    // 监听播放状态变化（全面同步 UI 状态）
     _audioPlayer.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.completed) {
+      final playing = state.playing;
+      final processing = state.processingState;
+
+      debugPrint('[Player] playerState: playing=$playing, processing=$processing');
+
+      if (processing == ProcessingState.completed) {
         _playerStore.setIsPlay(false);
         playNext(isAutoToggle: true);
+      } else if (playing && processing == ProcessingState.ready) {
+        _playerStore.setIsPlay(true);
+      } else if (!playing && processing == ProcessingState.ready) {
+        _playerStore.setIsPlay(false);
       }
     });
   }
@@ -138,6 +147,13 @@ class Player {
     try {
       debugPrint('[Player] _setResource: 设置音频 URL=$url');
       await _audioPlayer.setUrl(url);
+      // 恢复播放进度
+      final resumeTime = _settingStore.isSavePlayTime
+          ? _playerStore.progress.nowPlayTime
+          : 0;
+      if (resumeTime > 0) {
+        await _audioPlayer.seek(Duration(milliseconds: (resumeTime * 1000).toInt()));
+      }
       await _audioPlayer.play();
       debugPrint('[Player] _setResource: 播放成功');
       _playerStore.setIsPlay(true);
