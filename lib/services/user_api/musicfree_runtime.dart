@@ -244,6 +244,7 @@ class MusicFreeRuntime {
 
     // 1. 调用插件方法 — 使用 init() 中缓存的实例，不重新执行脚本
     final promiseId = 'mf_promise_${++_promiseIdCounter}';
+    final argsBase64 = base64Encode(utf8.encode(argsJson));
     final callCode = '''
       (function() {
         var plugin = globalThis.__mf_plugin_instance__;
@@ -256,7 +257,7 @@ class MusicFreeRuntime {
           globalThis.__mf_result_store__['$promiseId'] = JSON.stringify({error: 'method $methodName not found'});
           return 'done';
         }
-        var args = JSON.parse('${argsJson.replaceAll("'", "\\'")}');
+        var args = JSON.parse(atob('$argsBase64'));
         try {
           var promise = method.apply(plugin, args);
           if (promise && typeof promise.then === 'function') {
@@ -403,7 +404,9 @@ class MusicFreeRuntime {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[MF] _poll 事件处理异常: $e');
+    }
 
     // 3. 如果没有待处理的 Promise，停止轮询
     if (_pendingPromises.isEmpty) {
@@ -442,53 +445,55 @@ class MusicFreeRuntime {
     try {
       // 使用 dart:io HttpClient 发请求
       final client = io.HttpClient();
-      final uri = Uri.parse(url);
-      final timeoutDuration = Duration(milliseconds: timeout);
+      try {
+        final uri = Uri.parse(url);
+        final timeoutDuration = Duration(milliseconds: timeout);
 
-      late io.HttpClientRequest req;
-      if (method == 'POST') {
-        req = await client.postUrl(uri).timeout(timeoutDuration);
-      } else if (method == 'PUT') {
-        req = await client.putUrl(uri).timeout(timeoutDuration);
-      } else {
-        req = await client.getUrl(uri).timeout(timeoutDuration);
-      }
-
-      // 设置 headers
-      headers.forEach((k, v) => req.headers.set(k, v));
-
-      // 写入 body
-      if (body != null && (method == 'POST' || method == 'PUT')) {
-        final bodyStr = body is String ? body : jsonEncode(body);
-        req.write(bodyStr);
-      }
-
-      final resp = await req.close().timeout(timeoutDuration);
-      final statusCode = resp.statusCode;
-      final responseBody = await resp.transform(utf8.decoder).join().timeout(timeoutDuration);
-
-      // 收集响应 headers
-      final respHeaders = <String, String>{};
-      resp.headers.forEach((name, values) {
-        respHeaders[name] = values.join(', ');
-      });
-
-      // 注入响应到 JS（base64 编码避免转义问题）
-      debugPrint('[MF] HTTP 响应: $method $url → $statusCode (${responseBody.length} bytes)');
-      final respJson = jsonEncode({
-        'requestKey': requestKey,
-        'error': null,
-        'response': {
-          'statusCode': statusCode,
-          'statusMessage': '',
-          'headers': respHeaders,
-          'body': responseBody,
+        late io.HttpClientRequest req;
+        if (method == 'POST') {
+          req = await client.postUrl(uri).timeout(timeoutDuration);
+        } else if (method == 'PUT') {
+          req = await client.putUrl(uri).timeout(timeoutDuration);
+        } else {
+          req = await client.getUrl(uri).timeout(timeoutDuration);
         }
-      });
-      final respBase64 = base64Encode(utf8.encode(respJson));
-      _eval("handleMfNativeResponse(JSON.parse(atob('$respBase64')));");
 
-      client.close();
+        // 设置 headers
+        headers.forEach((k, v) => req.headers.set(k, v));
+
+        // 写入 body
+        if (body != null && (method == 'POST' || method == 'PUT')) {
+          final bodyStr = body is String ? body : jsonEncode(body);
+          req.write(bodyStr);
+        }
+
+        final resp = await req.close().timeout(timeoutDuration);
+        final statusCode = resp.statusCode;
+        final responseBody = await resp.transform(utf8.decoder).join().timeout(timeoutDuration);
+
+        // 收集响应 headers
+        final respHeaders = <String, String>{};
+        resp.headers.forEach((name, values) {
+          respHeaders[name] = values.join(', ');
+        });
+
+        // 注入响应到 JS（base64 编码避免转义问题）
+        debugPrint('[MF] HTTP 响应: $method $url → $statusCode (${responseBody.length} bytes)');
+        final respJson = jsonEncode({
+          'requestKey': requestKey,
+          'error': null,
+          'response': {
+            'statusCode': statusCode,
+            'statusMessage': '',
+            'headers': respHeaders,
+            'body': responseBody,
+          }
+        });
+        final respBase64 = base64Encode(utf8.encode(respJson));
+        _eval("handleMfNativeResponse(JSON.parse(atob('$respBase64')));");
+      } finally {
+        client.close();
+      }
     } catch (e) {
       debugPrint('[MF] HTTP 错误: $method $url → $e');
       final errJson = jsonEncode({
@@ -508,22 +513,21 @@ class MusicFreeRuntime {
     if (requestKey == null) return;
 
     try {
-      // 纯 JS 已处理，此分支不应触发，但保留以防万一
       final respJson = jsonEncode({
         'requestKey': requestKey,
         'error': null,
         'result': '',
       });
-      final escapedResp = respJson.replaceAll("'", "\\'");
-      _eval("handleMfCryptoResponse(JSON.parse('$escapedResp'));");
+      final respBase64 = base64Encode(utf8.encode(respJson));
+      _eval("handleMfCryptoResponse(JSON.parse(atob('$respBase64')));");
     } catch (e) {
       final errJson = jsonEncode({
         'requestKey': requestKey,
         'error': e.toString(),
         'result': null,
       });
-      final escapedErr = errJson.replaceAll("'", "\\'");
-      _eval("handleMfCryptoResponse(JSON.parse('$escapedErr'));");
+      final errBase64 = base64Encode(utf8.encode(errJson));
+      _eval("handleMfCryptoResponse(JSON.parse(atob('$errBase64')));");
     }
   }
 
