@@ -421,7 +421,10 @@ class MusicFreeRuntime {
     final method = (options['method'] as String? ?? 'GET').toUpperCase();
     final headers = (options['headers'] as Map<String, dynamic>?)?.cast<String, String>() ?? {};
     final body = options['body'];
-    final timeout = options['timeout'] as int? ?? 15000;
+    final timeoutRaw = options['timeout'];
+    final timeout = timeoutRaw is int ? timeoutRaw : (timeoutRaw is num ? timeoutRaw.toInt() : 15000);
+
+    debugPrint('[MF] HTTP $method $url (timeout: ${timeout}ms)');
 
     try {
       // 使用 dart:io HttpClient 发请求
@@ -458,6 +461,7 @@ class MusicFreeRuntime {
       });
 
       // 注入响应到 JS
+      debugPrint('[MF] HTTP 响应: $method $url → $statusCode (${responseBody.length} bytes)');
       final respJson = jsonEncode({
         'requestKey': requestKey,
         'error': null,
@@ -473,6 +477,7 @@ class MusicFreeRuntime {
 
       client.close();
     } catch (e) {
+      debugPrint('[MF] HTTP 错误: $method $url → $e');
       final errJson = jsonEncode({
         'requestKey': requestKey,
         'error': e.toString(),
