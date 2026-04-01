@@ -124,7 +124,7 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 有歌曲时的底栏 — 导航 | 封面+歌名 | 音乐控件居中 | 导航
+  /// 有歌曲时的底栏 — 导航 | 上一首 | 封面(含暂停) | 下一首 | 导航
   Widget _buildPlayerBar(PlayerStore store, playMusicInfo, ThemeData theme, BuildContext context) {
     final info = playMusicInfo.musicInfo;
 
@@ -133,7 +133,17 @@ class UnifiedBottomBar extends StatelessWidget {
         // 左侧导航
         _buildCompactNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
         _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
-        // 封面
+        const Spacer(),
+        // 上一首
+        IconButton(
+          icon: Icon(Icons.skip_previous_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
+          onPressed: () => globalPlayer.playPrevious(),
+          splashRadius: 18,
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          padding: EdgeInsets.zero,
+        ),
+        const SizedBox(width: 4),
+        // 封面 + 暂停覆盖 — 单击暂停/播放，长按进详情
         GestureDetector(
           onTap: () => globalPlayer.togglePlay(),
           onLongPress: () {
@@ -141,73 +151,41 @@ class UnifiedBottomBar extends StatelessWidget {
               SlideUpRoute(page: const PlayDetailScreen()),
             );
           },
-          child: Padding(
-            padding: const EdgeInsets.only(left: 6),
-            child: _AnimatedCover(
-              url: info.displayImg,
-              isPlaying: store.isPlay,
-              size: 36,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // 歌名
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Text(
-                store.statusText.isNotEmpty
-                    ? store.statusText
-                    : (info.name.isNotEmpty ? info.name : '未知歌曲'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: store.statusText.isNotEmpty ? theme.colorScheme.error : null,
+              _AnimatedCover(
+                url: info.displayImg,
+                isPlaying: store.isPlay,
+                size: 40,
+              ),
+              // 暂停/播放覆盖层
+              AnimatedOpacity(
+                opacity: store.isPlay ? 0.0 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.black45,
+                  ),
+                  child: const Icon(Icons.play_arrow_rounded, size: 26, color: Colors.white),
                 ),
               ),
-              if (info.singer.isNotEmpty)
-                Text(
-                  info.singer,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
             ],
           ),
         ),
-        // 音乐控件（居中）
+        const SizedBox(width: 4),
+        // 下一首
         IconButton(
-          icon: Icon(Icons.skip_previous_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
-          onPressed: () => globalPlayer.playPrevious(),
+          icon: Icon(Icons.skip_next_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
+          onPressed: () => globalPlayer.playNext(),
           splashRadius: 18,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          padding: EdgeInsets.zero,
-        ),
-        IconButton(
-          icon: Icon(
-            store.isPlay ? Icons.pause_circle_rounded : Icons.play_circle_rounded,
-            size: 32,
-            color: theme.colorScheme.primary,
-          ),
-          onPressed: () => globalPlayer.togglePlay(),
-          splashRadius: 20,
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           padding: EdgeInsets.zero,
         ),
-        IconButton(
-          icon: Icon(Icons.skip_next_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
-          onPressed: () => globalPlayer.playNext(),
-          splashRadius: 18,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          padding: EdgeInsets.zero,
-        ),
+        const Spacer(),
         // 右侧导航
         _buildCompactNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
         _buildCompactNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
