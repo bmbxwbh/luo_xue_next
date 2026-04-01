@@ -136,12 +136,13 @@ class UnifiedBottomBar extends StatelessWidget {
         _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
         const Spacer(),
         // 上一首
-        IconButton(
-          icon: Icon(Icons.skip_previous_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
-          onPressed: () => globalPlayer.playPrevious(),
-          splashRadius: 18,
-          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-          padding: EdgeInsets.zero,
+        GestureDetector(
+          onTap: () => globalPlayer.playPrevious(),
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(Icons.skip_previous_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
+          ),
         ),
         const SizedBox(width: 4),
         // 封面 + 暂停覆盖 — 单击暂停/播放，长按进详情
@@ -179,12 +180,13 @@ class UnifiedBottomBar extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         // 下一首
-        IconButton(
-          icon: Icon(Icons.skip_next_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
-          onPressed: () => globalPlayer.playNext(),
-          splashRadius: 18,
-          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-          padding: EdgeInsets.zero,
+        GestureDetector(
+          onTap: () => globalPlayer.playNext(),
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(Icons.skip_next_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
+          ),
         ),
         const Spacer(),
         // 右侧导航
