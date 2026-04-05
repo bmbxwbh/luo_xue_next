@@ -27,6 +27,49 @@ class SettingsScreen extends StatelessWidget {
 
   bool _isGlass(BuildContext c) => c.watch<SettingStore>().appStyle == 'liquid_glass';
 
+  void _showMFImportDialog(BuildContext ctx, TextEditingController controller, dynamic mfManager) {
+    showDialog(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: const Text('导入 MF 插件'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('通过 URL 导入 MusicFree 插件'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: '粘贴插件 URL 或脚本内容',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.code),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+            onPressed: () async {
+              final script = controller.text.trim();
+              if (script.isEmpty) return;
+              final result = await mfManager.importPlugin(script);
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(result['success'] == true ? '✅ ${result['message']}' : '❌ ${result['message']}')),
+                );
+              }
+            },
+            child: const Text('导入'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 统一构建列表项 — 根据风格自动选择 MD3 或 玻璃
   Widget _buildTile({
     required BuildContext context,
@@ -552,36 +595,7 @@ class SettingsScreen extends StatelessWidget {
         );
 
         return glass
-            ? showDialog(
-                context: ctx,
-                builder: (_) => AlertDialog(
-                  title: const Text('导入 MF 插件'),
-                  content: content,
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('取消'),
-                    ),
-                    FilledButton(
-                      onPressed: () async {
-                        final script = controller.text.trim();
-                        if (script.isEmpty) return;
-                        final mfManager = context.read<MusicFreeManager>();
-                        final result = await mfManager.importPlugin(script);
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(result['success'] == true
-                                ? '✅ ${result['message']}'
-                                : '❌ ${result['message']}')),
-                          );
-                        }
-                      },
-                      child: const Text('导入'),
-                    ),
-                  ],
-                ),
-              )
+            ? _showMFImportDialog(ctx, controller, mfManager)
             : AlertDialog(
                 title: const Text('导入 MF 插件'),
                 content: content,

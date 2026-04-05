@@ -361,7 +361,6 @@ class UnifiedBottomBar extends StatelessWidget {
       selectedIcon: Icon(activeIcon, size: 22),
       onPressed: () => onTap(index),
       color: color,
-      selectedColor: color,
       style: IconButton.styleFrom(
         backgroundColor: isGlass && selected ? theme.colorScheme.primary.withAlpha(30) : null,
       ),
