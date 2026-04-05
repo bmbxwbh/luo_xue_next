@@ -1,0 +1,842 @@
+/// MusicFree 插件运行时 — 执行 MF 格式插件并封装接口调用
+///
+/// 用途：加载 MusicFree 格式的 JS 插件，调用其 search/getMediaSource/getLyric 等方法。
+/// 参考：MusicFree/src/core/pluginManager/plugin.ts 的 PluginMethodsWrapper 类
+///
+/// 关键逻辑：
+/// - 通过 QuickJS 执行插件代码（用 musicfree_preload.dart 提供的 executeMfPlugin）
+/// - HTTP 请求通过事件队列传递到 Dart 侧（复用现有 __lx_event_queue__ 机制）
+/// - MF 插件的 Promise 通过 Dart 侧轮询驱动解析
+/// - 错误处理和超时
+library;
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart';
+import 'package:flutter_js/flutter_js.dart';
+import 'musicfree_preload.dart';
+import 'plugin_format_detector.dart';
+
+/// MusicFree 插件实例
+class MusicFreePlugin {
+  final String name;
+  final String hash;
+  final String path;
+  final MfPluginMeta meta;
+
+  const MusicFreePlugin({
+    required this.name,
+    required this.hash,
+    required this.path,
+    required this.meta,
+  });
+
+  bool get supportsSearch => meta.supportsSearch;
+  bool get supportsGetMediaSource => meta.supportsGetMediaSource;
+  bool get supportsGetLyric => meta.supportsGetLyric;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'hash': hash,
+        'path': path,
+        'meta': meta.toJson(),
+      };
+
+  factory MusicFreePlugin.fromJson(Map<String, dynamic> json) {
+    return MusicFreePlugin(
+      name: json['name'] as String? ?? '',
+      hash: json['hash'] as String? ?? '',
+      path: json['path'] as String? ?? '',
+      meta: MfPluginMeta(
+        platform: json['meta']?['platform'] as String? ?? json['name'] as String? ?? '',
+        methods: ((json['meta']?['methods'] as List?) ?? [])
+            .map((m) => MfPluginMethod.values.firstWhere(
+                  (e) => e.name == m,
+                  orElse: () => MfPluginMethod.search,
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
+/// MusicFree 运行时 — 管理 MF 插件的加载和调用
+class MusicFreeRuntime {
+  JavascriptRuntime? _jsRuntime;
+  MusicFreePlugin? _currentPlugin;
+  bool _initialized = false;
+  Timer? _pollTimer;
+
+  /// 脚本内容（用于每次调用时重新执行）
+  String _pluginScript = '';
+
+  /// 等待中的 Promise 回调
+  final Map<String, Completer<dynamic>> _pendingPromises = {};
+
+  /// 自增 Promise ID
+  int _promiseIdCounter = 0;
+
+  /// 兼容模式：从 console.log 中拦截 URL，跳过 getMediaSource Promise
+  bool compatibilityMode = true;
+
+  /// 从 console.log 拦截到的最近 URL
+  String? _lastInterceptedUrl;
+
+  MusicFreePlugin? get currentPlugin => _currentPlugin;
+  bool get isInitialized => _initialized && _currentPlugin != null;
+
+  /// 初始化运行时，加载插件
+  Future<bool> init(String scriptContent, String pluginPath) async {
+    try {
+      _pluginScript = scriptContent;
+
+      // 转义脚本（用于嵌入到单引号字符串中）
+      final escaped = _escapeForJs(scriptContent);
+
+      // 创建 QuickJS 运行时
+      _jsRuntime = getJavascriptRuntime();
+
+      // 初始化事件队列
+      _eval('globalThis.__lx_event_queue__ = [];');
+      _eval('globalThis.__mf_result_store__ = {};');
+
+      // 注入 MF 预加载脚本
+      final preloadResult = _eval(kMusicFreePreloadScript);
+      if (preloadResult.isEmpty) {
+        debugPrint('[MF] 预加载脚本执行失败，请检查脚本语法');
+        return false;
+      }
+
+      // 验证关键函数是否存在
+      final checkResult = _eval('typeof executeMfPlugin');
+      if (checkResult != 'function') {
+        debugPrint('[MF] executeMfPlugin 未定义，预加载脚本可能不完整');
+        return false;
+      }
+
+      // 执行插件并提取元信息（同时缓存实例到全局变量，避免重复执行）
+      final evalCode = '''
+        (function() {
+          var env = { appVersion: '1.0.0', os: 'android', lang: 'zh-CN', getUserVariables: function() { return {}; }, get userVariables() { return {}; } };
+          var result = executeMfPlugin('$escaped', env);
+          if (!result.success) return JSON.stringify({ error: result.error });
+          var p = result.instance;
+          // 缓存实例，后续调用直接复用，不重新执行脚本
+          globalThis.__mf_plugin_instance__ = p;
+          return JSON.stringify({
+            platform: p.platform || '',
+            version: p.version || '',
+            srcUrl: p.srcUrl || '',
+            supportedSearchType: p.supportedSearchType || [],
+            hasSearch: typeof p.search === 'function',
+            hasSearchMusic: typeof p.searchMusic === 'function',
+            hasSearchAlbum: typeof p.searchAlbum === 'function',
+            hasSearchMusicSheet: typeof p.searchMusicSheet === 'function',
+            hasSearchArtist: typeof p.searchArtist === 'function',
+            hasSearchLyric: typeof p.searchLyric === 'function',
+            hasGetMediaSource: typeof p.getMediaSource === 'function',
+            hasGetLyric: typeof p.getLyric === 'function',
+            hasGetMusicInfo: typeof p.getMusicInfo === 'function',
+            hasGetAlbumInfo: typeof p.getAlbumInfo === 'function',
+            hasImportMusicSheet: typeof p.importMusicSheet === 'function',
+            hasImportMusicItem: typeof p.importMusicItem === 'function',
+            hasGetTopLists: typeof p.getTopLists === 'function',
+            hasGetRecommendSheetTags: typeof p.getRecommendSheetTags === 'function',
+            hasGetRecommendSheetsByTag: typeof p.getRecommendSheetsByTag === 'function',
+            hasGetMusicSheetInfo: typeof p.getMusicSheetInfo === 'function',
+            hasGetTopListDetail: typeof p.getTopListDetail === 'function',
+            hasGetArtistWorks: typeof p.getArtistWorks === 'function',
+            hasGetMusicComments: typeof p.getMusicComments === 'function',
+            hasDefaultSearchType: p.defaultSearchType || '',
+            hasAuthor: p.author || '',
+            hasDescription: p.description || '',
+            appVersion: p.appVersion || '',
+            order: p.order || 0,
+            cacheControl: p.cacheControl || '',
+            primaryKey: p.primaryKey || [],
+            hints: p.hints || {},
+          });
+        })()
+      ''';
+
+      final result = _eval(evalCode);
+      if (result.isEmpty) {
+        debugPrint('[MF] 插件执行返回空，可能脚本有语法错误');
+        return false;
+      }
+
+      dynamic parsed;
+      try {
+        parsed = jsonDecode(result);
+      } catch (e) {
+        debugPrint('[MF] 插件解析 JSON 失败: $e, result=$result');
+        return false;
+      }
+      if (parsed is! Map<String, dynamic>) {
+        debugPrint('[MF] 插件解析结果不是对象: ${parsed.runtimeType}');
+        return false;
+      }
+      final data = parsed;
+
+      if (data.containsKey('error')) {
+        debugPrint('[MF] 插件解析错误: ${data['error']}');
+        return false;
+      }
+
+      final methods = <MfPluginMethod>[];
+      if (data['hasSearch'] == true) methods.add(MfPluginMethod.search);
+      if (data['hasSearchMusic'] == true) methods.add(MfPluginMethod.searchMusic);
+      if (data['hasSearchAlbum'] == true) methods.add(MfPluginMethod.searchAlbum);
+      if (data['hasSearchMusicSheet'] == true) methods.add(MfPluginMethod.searchMusicSheet);
+      if (data['hasSearchArtist'] == true) methods.add(MfPluginMethod.searchArtist);
+      if (data['hasSearchLyric'] == true) methods.add(MfPluginMethod.searchLyric);
+      if (data['hasGetMediaSource'] == true) methods.add(MfPluginMethod.getMediaSource);
+      if (data['hasGetLyric'] == true) methods.add(MfPluginMethod.getLyric);
+      if (data['hasGetMusicInfo'] == true) methods.add(MfPluginMethod.getMusicInfo);
+      if (data['hasGetAlbumInfo'] == true) methods.add(MfPluginMethod.getAlbumInfo);
+      if (data['hasImportMusicSheet'] == true) methods.add(MfPluginMethod.importMusicSheet);
+      if (data['hasImportMusicItem'] == true) methods.add(MfPluginMethod.importMusicItem);
+      if (data['hasGetTopLists'] == true) methods.add(MfPluginMethod.getTopLists);
+      if (data['hasGetRecommendSheetTags'] == true) methods.add(MfPluginMethod.getRecommendSheetTags);
+      if (data['hasGetRecommendSheetsByTag'] == true) methods.add(MfPluginMethod.getRecommendSheetsByTag);
+      if (data['hasGetMusicSheetInfo'] == true) methods.add(MfPluginMethod.getMusicSheetInfo);
+      if (data['hasGetTopListDetail'] == true) methods.add(MfPluginMethod.getTopListDetail);
+      if (data['hasGetArtistWorks'] == true) methods.add(MfPluginMethod.getArtistWorks);
+      if (data['hasGetMusicComments'] == true) methods.add(MfPluginMethod.getMusicComments);
+
+      final meta = MfPluginMeta(
+        platform: data['platform'] as String? ?? '',
+        version: data['version'] as String?,
+        srcUrl: data['srcUrl'] as String?,
+        appVersion: data['appVersion'] as String?,
+        cacheControl: data['cacheControl'] as String?,
+        order: data['order'] is int ? data['order'] : 0,
+        primaryKey: (data['primaryKey'] as List?)?.cast<String>() ?? [],
+        hints: (data['hints'] as Map?)?.cast<String, dynamic>() ?? {},
+        methods: methods,
+      );
+
+      _currentPlugin = MusicFreePlugin(
+        name: meta.platform,
+        hash: '',
+        path: pluginPath,
+        meta: meta,
+      );
+
+      _initialized = true;
+      debugPrint('[MF] 插件加载成功: ${meta.platform}, 方法: ${methods.map((m) => m.name).toList()}');
+      return true;
+    } catch (e) {
+      debugPrint('[MF] 插件初始化异常: $e');
+      return false;
+    }
+  }
+
+  /// 调用插件方法（通用）
+  ///
+  /// [methodName] 方法名（如 'search'、'getMediaSource'、'getLyric'）
+  /// [args] 参数列表（会被 JSON.stringify）
+  /// [timeout] 超时时间
+  /// 返回方法执行结果
+  Future<dynamic> _callPluginMethod(
+    String methodName,
+    List<dynamic> args, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    if (!isInitialized) return null;
+
+    final argsJson = jsonEncode(args);
+
+    // 1. 调用插件方法 — 使用 init() 中缓存的实例，不重新执行脚本
+    final promiseId = 'mf_promise_${++_promiseIdCounter}';
+    final argsBase64 = base64Encode(utf8.encode(argsJson));
+    final callCode = '''
+      (function() {
+        var plugin = globalThis.__mf_plugin_instance__;
+        if (!plugin) {
+          globalThis.__mf_result_store__['$promiseId'] = JSON.stringify({error: 'plugin instance not cached'});
+          return 'done';
+        }
+        var method = plugin['$methodName'];
+        if (typeof method !== 'function') {
+          globalThis.__mf_result_store__['$promiseId'] = JSON.stringify({error: 'method $methodName not found'});
+          return 'done';
+        }
+        var args = JSON.parse(atob('$argsBase64'));
+        try {
+          var promise = method.apply(plugin, args);
+          if (promise && typeof promise.then === 'function') {
+            promise.then(function(r) {
+              globalThis.__mf_result_store__['$promiseId'] = JSON.stringify(r);
+            }).catch(function(e) {
+              globalThis.__mf_result_store__['$promiseId'] = JSON.stringify({error: e.message || String(e)});
+            });
+            return 'pending';
+          } else {
+            globalThis.__mf_result_store__['$promiseId'] = JSON.stringify(promise);
+            return 'done';
+          }
+        } catch(e) {
+          globalThis.__mf_result_store__['$promiseId'] = JSON.stringify({error: e.message || String(e)});
+          return 'done';
+        }
+      })()
+    ''';
+
+    final callResult = _eval(callCode);
+
+    // 2. 如果同步完成，直接返回
+    if (callResult == 'done') {
+      return _consumeResult(promiseId);
+    }
+
+    // 3. 如果是 Promise，轮询等待
+    final completer = Completer<dynamic>();
+    _pendingPromises[promiseId] = completer;
+
+    // 启动轮询（如果还没启动）
+    _startPolling();
+
+    // 等待结果或超时
+    try {
+      return await completer.future.timeout(timeout);
+    } on TimeoutException {
+      _pendingPromises.remove(promiseId);
+      debugPrint('[MF] $methodName 调用超时');
+      return null;
+    }
+  }
+
+  /// 消费已存储的结果
+  dynamic _consumeResult(String promiseId) {
+    final getResultCode = '''
+      (function() {
+        var r = globalThis.__mf_result_store__['$promiseId'];
+        delete globalThis.__mf_result_store__['$promiseId'];
+        return r || 'null';
+      })()
+    ''';
+    final raw = _eval(getResultCode);
+    if (raw == 'null' || raw.isEmpty) return null;
+    try {
+      final parsed = jsonDecode(raw);
+      if (parsed is Map && parsed.containsKey('error')) {
+        debugPrint('[MF] 方法返回错误: ${parsed['error']}');
+        return null;
+      }
+      return parsed;
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  /// 启动轮询（检查 Promise 结果 + 处理 HTTP 事件）
+  void _startPolling() {
+    if (_pollTimer != null && _pollTimer!.isActive) return;
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 30), (_) => _poll());
+  }
+
+  /// 轮询处理
+  void _poll() {
+    if (_jsRuntime == null) {
+      _pollTimer?.cancel();
+      return;
+    }
+
+    // 1. 检查 Promise 结果
+    if (_pendingPromises.isNotEmpty) {
+      final checkCode = '''
+        (function() {
+          var results = {};
+          var keys = Object.keys(globalThis.__mf_result_store__ || {});
+          for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (k.indexOf('mf_promise_') === 0 && globalThis.__mf_result_store__[k]) {
+              results[k] = globalThis.__mf_result_store__[k];
+              delete globalThis.__mf_result_store__[k];
+            }
+          }
+          return JSON.stringify(results);
+        })()
+      ''';
+      try {
+        final raw = _eval(checkCode);
+        if (raw.isNotEmpty && raw != '{}') {
+          final results = jsonDecode(raw) as Map<String, dynamic>;
+          for (final entry in results.entries) {
+            final completer = _pendingPromises.remove(entry.key);
+            if (completer != null && !completer.isCompleted) {
+              try {
+                final value = jsonDecode(entry.value as String);
+                if (value is Map && value.containsKey('error')) {
+                  completer.complete(null);
+                } else {
+                  completer.complete(value);
+                }
+              } catch (_) {
+                completer.complete(entry.value);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. 处理 HTTP 事件（复用 __lx_event_queue__）
+    try {
+      final eventsCode = '''
+        (function(){
+          if(!globalThis.__lx_event_queue__||!globalThis.__lx_event_queue__.length) return '[]';
+          var e=globalThis.__lx_event_queue__.splice(0);
+          return JSON.stringify(e);
+        })()
+      ''';
+      final eventsRaw = _eval(eventsCode);
+      if (eventsRaw.isNotEmpty && eventsRaw != '[]') {
+        final events = jsonDecode(eventsRaw) as List;
+        for (final event in events) {
+          final action = event['action'] as String?;
+          final dataStr = event['data'] as String?;
+          if (action == null || dataStr == null) continue;
+          final data = jsonDecode(dataStr) as Map<String, dynamic>;
+
+          if (action == 'mf_request') {
+            _handleHttpRequest(data);
+          } else if (action == 'mf_crypto') {
+            _handleCryptoRequest(data);
+          } else if (action == '__log__') {
+            final msg = data['msg']?.toString() ?? '';
+            debugPrint('[MF Plugin] $msg');
+            // 兼容模式：拦截包含 http(s):// 的日志，提取 URL
+            if (compatibilityMode) {
+              final urlMatch = RegExp(r'(https?://[^\s,}\]]+)').firstMatch(msg);
+              if (urlMatch != null) {
+                _lastInterceptedUrl = urlMatch.group(1);
+                debugPrint('[MF] 兼容模式拦截 URL: $_lastInterceptedUrl');
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[MF] _poll 事件处理异常: $e');
+    }
+
+    // 3. 如果没有待处理的 Promise，停止轮询
+    if (_pendingPromises.isEmpty) {
+      _pollTimer?.cancel();
+    }
+  }
+
+  /// 处理 HTTP 请求事件
+  Future<void> _handleHttpRequest(Map<String, dynamic> data) async {
+    final requestKey = data['requestKey'] as String?;
+    final url = data['url'] as String? ?? '';
+    final options = data['options'] as Map<String, dynamic>?;
+
+    debugPrint('[MF] HTTP 收到请求: key=$requestKey, url=$url, options=$options');
+    if (requestKey == null || options == null) {
+      debugPrint('[MF] HTTP 请求缺少关键字段，跳过');
+      return;
+    }
+
+    final method = (options['method'] as String? ?? 'GET').toUpperCase();
+    final headers = (options['headers'] as Map<String, dynamic>?)?.cast<String, String>() ?? {};
+    final body = options['body'];
+    final timeoutRaw = options['timeout'];
+    final timeout = timeoutRaw is int ? timeoutRaw : (timeoutRaw is num ? timeoutRaw.toInt() : 15000);
+
+    if (url.isEmpty) {
+      debugPrint('[MF] HTTP URL 为空，返回错误');
+      final errJson = jsonEncode({'requestKey': requestKey, 'error': 'URL is empty', 'response': null});
+      final errBase64 = base64Encode(utf8.encode(errJson));
+      _eval("handleMfNativeResponse(JSON.parse(atob('$errBase64')));");
+      return;
+    }
+
+    debugPrint('[MF] HTTP $method $url (timeout: ${timeout}ms)');
+
+    try {
+      // 使用 dart:io HttpClient 发请求
+      final client = io.HttpClient();
+      try {
+        final uri = Uri.parse(url);
+        final timeoutDuration = Duration(milliseconds: timeout);
+
+        late io.HttpClientRequest req;
+        if (method == 'POST') {
+          req = await client.postUrl(uri).timeout(timeoutDuration);
+        } else if (method == 'PUT') {
+          req = await client.putUrl(uri).timeout(timeoutDuration);
+        } else {
+          req = await client.getUrl(uri).timeout(timeoutDuration);
+        }
+
+        // 设置 headers
+        headers.forEach((k, v) => req.headers.set(k, v));
+
+        // 写入 body
+        if (body != null && (method == 'POST' || method == 'PUT')) {
+          final bodyStr = body is String ? body : jsonEncode(body);
+          req.write(bodyStr);
+        }
+
+        final resp = await req.close().timeout(timeoutDuration);
+        final statusCode = resp.statusCode;
+        final responseBody = await resp.transform(utf8.decoder).join().timeout(timeoutDuration);
+
+        // 收集响应 headers
+        final respHeaders = <String, String>{};
+        resp.headers.forEach((name, values) {
+          respHeaders[name] = values.join(', ');
+        });
+
+        // 注入响应到 JS（base64 编码避免转义问题）
+        debugPrint('[MF] HTTP 响应: $method $url → $statusCode (${responseBody.length} bytes)');
+        final respJson = jsonEncode({
+          'requestKey': requestKey,
+          'error': null,
+          'response': {
+            'statusCode': statusCode,
+            'statusMessage': '',
+            'headers': respHeaders,
+            'body': responseBody,
+          }
+        });
+        final respBase64 = base64Encode(utf8.encode(respJson));
+        _eval("handleMfNativeResponse(JSON.parse(atob('$respBase64')));");
+      } finally {
+        client.close();
+      }
+    } catch (e) {
+      debugPrint('[MF] HTTP 错误: $method $url → $e');
+      final errJson = jsonEncode({
+        'requestKey': requestKey,
+        'error': e.toString(),
+        'response': null,
+      });
+      final errBase64 = base64Encode(utf8.encode(errJson));
+      _eval("handleMfNativeResponse(JSON.parse(atob('$errBase64')));");
+    }
+  }
+
+  /// 处理 MF 插件的加密请求（SHA256/AES 异步回退）
+  /// 注意：纯 JS SHA256/AES 已在 preload 中实现，此方法作为兜底
+  Future<void> _handleCryptoRequest(Map<String, dynamic> data) async {
+    final requestKey = data['requestKey'] as String?;
+    if (requestKey == null) return;
+
+    try {
+      final respJson = jsonEncode({
+        'requestKey': requestKey,
+        'error': null,
+        'result': '',
+      });
+      final respBase64 = base64Encode(utf8.encode(respJson));
+      _eval("handleMfCryptoResponse(JSON.parse(atob('$respBase64')));");
+    } catch (e) {
+      final errJson = jsonEncode({
+        'requestKey': requestKey,
+        'error': e.toString(),
+        'result': null,
+      });
+      final errBase64 = base64Encode(utf8.encode(errJson));
+      _eval("handleMfCryptoResponse(JSON.parse(atob('$errBase64')));");
+    }
+  }
+
+  /// 调用插件的 search 方法
+  /// MF 原版返回: { isEnd?: boolean, data: IMusicItem[] }
+  /// Parcel 打包的插件可能用 searchMusic/searchAlbum/searchMusicSheet/searchArtist/searchLyric 替代
+  Future<Map<String, dynamic>> search(
+    String query, int page, String type,
+  ) async {
+    // 优先使用标准 search(query, page, type)
+    dynamic result = await _callPluginMethod('search', [query, page, type]);
+
+    // 标准 search 无效时，回退到类型特化方法（Parcel 打包格式）
+    if (result == null) {
+      String methodName;
+      switch (type) {
+        case 'music':
+          methodName = 'searchMusic';
+          break;
+        case 'album':
+          methodName = 'searchAlbum';
+          break;
+        case 'sheet':
+          methodName = 'searchMusicSheet';
+          break;
+        case 'artist':
+          methodName = 'searchArtist';
+          break;
+        case 'lyric':
+          methodName = 'searchLyric';
+          break;
+        default:
+          methodName = 'searchMusic';
+      }
+      result = await _callPluginMethod(methodName, [query, page]);
+    }
+
+    if (result is Map) {
+      return {
+        'isEnd': result['isEnd'] ?? true,
+        'data': ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>(),
+      };
+    }
+    return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+  }
+
+  /// 调用插件的 getMediaSource 方法
+  /// 部分插件（如酷我念心、网易念心、网易 Ciallo、xiaowo）不提供 getMediaSource，
+  /// 搜索结果自带 url 字段，此时直接从 musicItem 取 url
+  /// MF 原版还会检查 qualities[quality].url
+  Future<Map<String, dynamic>?> getMediaSource(
+    Map<String, dynamic> musicItem, String quality,
+  ) async {
+    // 兼容模式：先清空拦截 URL
+    _lastInterceptedUrl = null;
+
+    // 先尝试调用插件的 getMediaSource
+    if (currentPlugin?.meta.methods.contains(MfPluginMethod.getMediaSource) == true) {
+      dynamic result;
+
+      if (compatibilityMode) {
+        // 兼容模式：竞速 — 插件调用 vs 拦截 URL
+        // 每 100ms 检查一次拦截 URL，一旦出现立即返回
+        final interceptedFuture = _waitForInterceptedUrl(
+          timeout: const Duration(seconds: 15),
+        );
+        final pluginFuture = _callPluginMethod('getMediaSource', [musicItem, quality]);
+
+        final raceResult = await Future.any([
+          pluginFuture,
+          interceptedFuture,
+        ]);
+
+        if (raceResult is String && raceResult.isNotEmpty) {
+          // 拦截 URL 先到
+          debugPrint('[MF] 兼容模式：拦截 URL 竞速获胜 = $raceResult');
+          return {'url': raceResult};
+        }
+        // 插件调用先完成
+        result = raceResult;
+
+        // 插件调用失败但有拦截 URL
+        if (result == null && _lastInterceptedUrl != null) {
+          debugPrint('[MF] 兼容模式：使用拦截 URL = $_lastInterceptedUrl');
+          return {'url': _lastInterceptedUrl};
+        }
+      } else {
+        result = await _callPluginMethod('getMediaSource', [musicItem, quality]);
+      }
+
+      if (result is Map) {
+        final url = result['url'] as String?;
+        if (url != null && url.isNotEmpty) {
+          return {
+            'url': url,
+            if (result['headers'] != null) 'headers': result['headers'],
+            if (result['userAgent'] != null) 'userAgent': result['userAgent'],
+          };
+        }
+      }
+    }
+
+    // getMediaSource 不可用或返回空时，回退：
+    // 1. 检查 qualities[quality].url（MF 原版的标准兜底）
+    final qualities = musicItem['qualities'] as Map<String, dynamic>?;
+    if (qualities != null && qualities.containsKey(quality)) {
+      final qualityInfo = qualities[quality];
+      if (qualityInfo is Map<String, dynamic>) {
+        final url = qualityInfo['url'] as String?;
+        if (url != null && url.isNotEmpty) {
+          debugPrint('[MF] getMediaSource 回退到 qualities[$quality].url');
+          return {'url': url};
+        }
+      }
+    }
+
+    // 2. 检查 musicItem.url（顶级 url 字段）
+    final url = musicItem['url'] as String?;
+    if (url != null && url.isNotEmpty) {
+      debugPrint('[MF] getMediaSource 回退到 musicItem.url');
+      return {'url': url};
+    }
+
+    return null;
+  }
+
+  /// 等待拦截 URL 出现（每 100ms 检查一次）
+  /// 返回拦截到的 URL，超时返回 null
+  Future<String?> _waitForInterceptedUrl({required Duration timeout}) async {
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      final url = _lastInterceptedUrl;
+      if (url != null && url.isNotEmpty) {
+        _lastInterceptedUrl = null; // 消费掉
+        return url;
+      }
+    }
+    return null;
+  }
+
+  /// 调用插件的 getLyric 方法
+  /// 多数插件用 rawLrc，网易插件用 rawLrcTxt，统一处理
+  /// MF 原版还支持 lrc (歌词URL，已废弃但部分插件仍返回)
+  Future<Map<String, dynamic>?> getLyric(Map<String, dynamic> musicItem) async {
+    final result = await _callPluginMethod('getLyric', [musicItem]);
+    if (result is Map) {
+      final map = result.cast<String, dynamic>();
+      // 统一歌词字段：rawLrcTxt → rawLrc
+      if (map['rawLrc'] == null && map['rawLrcTxt'] != null) {
+        map['rawLrc'] = map['rawLrcTxt'];
+      }
+      return map;
+    }
+    return null;
+  }
+
+  /// 调用插件的 getRecommendSheetTags 方法（获取歌单分类标签）
+  Future<Map<String, dynamic>?> getRecommendSheetTags() async {
+    final result = await _callPluginMethod('getRecommendSheetTags', []);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 getRecommendSheetsByTag 方法（获取分类下的歌单列表）
+  Future<Map<String, dynamic>> getRecommendSheetsByTag(Map<String, dynamic> tag, int page) async {
+    final result = await _callPluginMethod('getRecommendSheetsByTag', [tag, page]);
+    if (result is Map) {
+      return {
+        'isEnd': result['isEnd'] ?? true,
+        'data': ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>(),
+      };
+    }
+    return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+  }
+
+  /// 调用插件的 getMusicSheetInfo 方法（获取歌单详情）
+  Future<Map<String, dynamic>?> getMusicSheetInfo(Map<String, dynamic> sheetItem, int page) async {
+    final result = await _callPluginMethod('getMusicSheetInfo', [sheetItem, page]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 importMusicSheet 方法（导入歌单）
+  Future<List<Map<String, dynamic>>> importMusicSheet(String url) async {
+    final result = await _callPluginMethod('importMusicSheet', [url]);
+    if (result is List) return result.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// 调用插件的 getTopLists 方法（获取榜单列表）
+  Future<List<Map<String, dynamic>>> getTopLists() async {
+    final result = await _callPluginMethod('getTopLists', []);
+    if (result is List) return result.cast<Map<String, dynamic>>();
+    if (result is Map && result['data'] is List) return (result['data'] as List).cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// 调用插件的 getTopListDetail 方法（获取榜单详情）
+  Future<Map<String, dynamic>?> getTopListDetail(Map<String, dynamic> topListItem, int page) async {
+    final result = await _callPluginMethod('getTopListDetail', [topListItem, page]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 getMusicInfo 方法（通过主键查询歌曲信息）
+  Future<Map<String, dynamic>?> getMusicInfo(Map<String, dynamic> mediaBase) async {
+    final result = await _callPluginMethod('getMusicInfo', [mediaBase]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 getAlbumInfo 方法（获取专辑信息+歌曲分页）
+  Future<Map<String, dynamic>?> getAlbumInfo(Map<String, dynamic> albumItem, int page) async {
+    final result = await _callPluginMethod('getAlbumInfo', [albumItem, page]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 importMusicItem 方法（通过 URL 导入单曲）
+  Future<Map<String, dynamic>?> importMusicItem(String url) async {
+    final result = await _callPluginMethod('importMusicItem', [url]);
+    if (result is Map) return result.cast<String, dynamic>();
+    return null;
+  }
+
+  /// 调用插件的 getArtistWorks 方法（获取歌手作品）
+  /// [type] 支持 "music" | "album"
+  Future<Map<String, dynamic>> getArtistWorks(
+    Map<String, dynamic> artistItem, int page, String type,
+  ) async {
+    final result = await _callPluginMethod('getArtistWorks', [artistItem, page, type]);
+    if (result is Map) {
+      return {
+        'isEnd': result['isEnd'] ?? true,
+        'data': ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>(),
+      };
+    }
+    return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+  }
+
+  /// 调用插件的 getMusicComments 方法（获取歌曲评论）
+  Future<Map<String, dynamic>> getMusicComments(
+    Map<String, dynamic> musicItem, int page,
+  ) async {
+    final result = await _callPluginMethod('getMusicComments', [musicItem, page]);
+    if (result is Map) {
+      return {
+        'isEnd': result['isEnd'] ?? true,
+        'data': ((result['data'] as List?) ?? []).cast<Map<String, dynamic>>(),
+      };
+    }
+    return {'isEnd': true, 'data': <Map<String, dynamic>>[]};
+  }
+
+  /// eval 包装（统一错误处理）
+  String _eval(String code) {
+    try {
+      final result = _jsRuntime!.evaluate(code);
+      final str = result.stringResult;
+      // 检测 JS 返回的错误（JS 异常不会抛 Dart 异常，而是返回错误字符串）
+      if (str.startsWith('ReferenceError:') ||
+          str.startsWith('TypeError:') ||
+          str.startsWith('SyntaxError:') ||
+          str.startsWith('Error:') ||
+          str.startsWith('RangeError:') ||
+          str.startsWith('URIError:') ||
+          str.startsWith('EvalError:')) {
+        debugPrint('[MF] JS 错误: ${str.substring(0, str.length > 200 ? 200 : str.length)}');
+        return '';
+      }
+      return str;
+    } catch (e) {
+      debugPrint('[MF] eval 错误: $e');
+      return '';
+    }
+  }
+
+  /// 转义 JS 字符串（用于嵌入到单引号中）
+  String _escapeForJs(String code) {
+    return code
+        .replaceAll('\\', '\\\\')
+        .replaceAll("'", "\\'")
+        .replaceAll('\n', '\\n')
+        .replaceAll('\r', '\\r');
+  }
+
+  /// 释放资源
+  void dispose() {
+    _pollTimer?.cancel();
+    _jsRuntime?.dispose();
+    _jsRuntime = null;
+    _currentPlugin = null;
+    _initialized = false;
+    _pendingPromises.clear();
+  }
+}

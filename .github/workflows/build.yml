@@ -1,0 +1,71 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Set Version
+        id: version
+        run: |
+          # 获取北京时间 (UTC+8)
+          DATE=$(TZ='Asia/Shanghai' date '+%y.%m.%d')
+          HOUR=$(TZ='Asia/Shanghai' date '+%H')
+          BUILD_TIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')
+          VERSION_NAME="${DATE}"
+          VERSION_CODE="${DATE//./}${HOUR}"
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "version_code=${VERSION_CODE}" >> $GITHUB_OUTPUT
+          echo "build_time=${BUILD_TIME}" >> $GITHUB_OUTPUT
+          echo "版本名: ${VERSION_NAME}, 版本号: ${VERSION_CODE}, 构建时间: ${BUILD_TIME}"
+
+      - name: Update pubspec version
+        run: |
+          sed -i "s/^version: .*/version: ${{ steps.version.outputs.version_name }}+${{ steps.version.outputs.version_code }}/" pubspec.yaml
+          grep "version:" pubspec.yaml
+
+      - name: Pub Get
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: luo_xue_next-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version_code }}
+          name: v${{ steps.version.outputs.version_name }}
+          body: |
+            🎵 洛雪音乐 Next - v${{ steps.version.outputs.version_name }}
+            - 版本号: ${{ steps.version.outputs.version_code }}
+            - 构建时间: ${{ steps.version.outputs.build_time }}
+            - Commit: ${{ github.event.head_commit.message }}
+          files: build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true

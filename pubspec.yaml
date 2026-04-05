@@ -1,0 +1,42 @@
+name: fu_sheng_music
+description: 浮生音乐 - Flutter版跨平台音乐播放器
+publish_to: 'none'
+version: 26.03.28+26032823
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.5
+  just_audio: ^0.9.46
+  audio_session: ^0.1.25
+  shared_preferences: ^2.5.4
+  http: ^1.6.0
+  path_provider: ^2.1.5
+  permission_handler: ^11.4.0
+  encrypt: ^5.0.3
+  crypto: ^3.0.7
+  cached_network_image: ^3.3.1
+  file_picker: ^8.0.0+1
+  flutter_js: ^0.8.1
+  dynamic_color: ^1.8.1
+  url_launcher: ^6.3.1
+  liquid_glass_widgets: ^0.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/script/

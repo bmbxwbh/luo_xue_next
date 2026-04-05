@@ -1,0 +1,35 @@
+version: '1.0'
+name: flutter-apk-build
+displayName: Flutter APK Build
+triggers:
+  push:
+    branches:
+      include:
+        - main
+
+stages:
+  - stage:
+    name: build
+    displayName: 构建 Release APK
+    steps:
+      - step: build@docker
+        name: build_docker
+        displayName: Flutter 构建
+        # 使用官方 Flutter Docker 镜像
+        image: ghcr.io/cirruslabs/flutter:stable
+        commands:
+          - flutter doctor -v
+          - flutter pub get
+          - flutter build apk --release
+        # 保存产物
+        artifacts:
+          - name: apk
+            path:
+              - build/app/outputs/flutter-apk/app-release.apk
+
+      - step: publish@general_artifacts
+        name: upload
+        displayName: 上传 APK
+        dependArtifact: apk
+        artifactName: luo_xue_apk
+        dependsOn: build_docker
