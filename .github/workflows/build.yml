@@ -1,4 +1,4 @@
-name: Build Flutter APK
+name: Build - 浮生音乐 APK
 
 on:
   push:
@@ -54,18 +54,19 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: luo_xue_next-apk
+          name: fusheng-music-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version_code }}
-          name: v${{ steps.version.outputs.version_name }}
+          name: Build ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})
           body: |
-            🎵 洛雪音乐 Next - v${{ steps.version.outputs.version_name }}
+            🎵 浮生音乐 - Build ${{ steps.version.outputs.version_name }}
+            - 包名: com.fusheng.fu_sheng_music
             - 版本号: ${{ steps.version.outputs.version_code }}
             - 构建时间: ${{ steps.version.outputs.build_time }}
-            - Commit: ${{ github.event.head_commit.message }}
+            - Commit: ${{ github.sha }}
           files: build/app/outputs/flutter-apk/app-release.apk
           generate_release_notes: true
