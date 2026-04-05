@@ -27,7 +27,7 @@ class SettingsScreen extends StatelessWidget {
 
   bool _isGlass(BuildContext c) => c.watch<SettingStore>().appStyle == 'liquid_glass';
 
-  void _showMFImportDialog(BuildContext ctx, TextEditingController controller, dynamic mfManager) {
+  void _showMFImportDialog(BuildContext ctx, TextEditingController controller) {
     showDialog(
       context: ctx,
       builder: (_) => AlertDialog(
@@ -43,7 +43,6 @@ class SettingsScreen extends StatelessWidget {
               decoration: const InputDecoration(
                 hintText: '粘贴插件 URL 或脚本内容',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.code),
               ),
               maxLines: 3,
             ),
@@ -55,10 +54,12 @@ class SettingsScreen extends StatelessWidget {
             onPressed: () async {
               final script = controller.text.trim();
               if (script.isEmpty) return;
+              if (!ctx.mounted) return;
+              final mfManager = ctx.read<MusicFreeManager>();
               final result = await mfManager.importPlugin(script);
               if (ctx.mounted) {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(content: Text(result['success'] == true ? '✅ ${result['message']}' : '❌ ${result['message']}')),
                 );
               }
@@ -594,9 +595,10 @@ class SettingsScreen extends StatelessWidget {
           ],
         );
 
-        return glass
-            ? _showMFImportDialog(ctx, controller, mfManager)
-            : AlertDialog(
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (glass) _showMFImportDialog(ctx, controller);
+        });
+        return AlertDialog(
                 title: const Text('导入 MF 插件'),
                 content: content,
                 actions: [
