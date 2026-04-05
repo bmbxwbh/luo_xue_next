@@ -1090,7 +1090,7 @@ class _GlassSpeedSheet extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
                 '倍速播放',
-                style: cs.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600) ?? const TextStyle(),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600) ?? const TextStyle(),
               ),
             ),
             Padding(

@@ -110,9 +110,9 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
           // 顶栏 — 悬浮胶囊，一直存在
           Container(
-                  height: 80,
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                  child: BackdropFilter(
+            height: 80,
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
                     child: Container(
                       decoration: BoxDecoration(
@@ -222,16 +222,13 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                 ),
-          ),
           // Tab内容
           Expanded(
             child: TabBarView(
-                controller: _tabController,
-                children: [
-                  TabSongList(source: _source, sourceVersion: globalSourceVersion),
-                  TabLeaderboard(source: _source, sourceVersion: globalSourceVersion),
-                ],
-              ),
+              children: [
+                TabSongList(source: _source, sourceVersion: globalSourceVersion),
+                TabLeaderboard(source: _source, sourceVersion: globalSourceVersion),
+              ],
             ),
           ),
         ],

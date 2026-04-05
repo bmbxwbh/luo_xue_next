@@ -9,16 +9,11 @@ import '../services/settings/setting_store.dart';
 import '../utils/global.dart';
 import '../utils/page_transitions.dart';
 
-/// 统一毛玻璃悬浮底栏 — 集成导航 + 迷你播放器 + 进度条
 class UnifiedBottomBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  const UnifiedBottomBar({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-  });
+  const UnifiedBottomBar({super.key, required this.currentIndex, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -28,11 +23,7 @@ class UnifiedBottomBar extends StatelessWidget {
     final playMusicInfo = store.playMusicInfo;
     final theme = Theme.of(context);
     final hasPlayer = playMusicInfo != null;
-    final barHeight = hasPlayer ? 100.0 : 56.0;
-
-    if (isGlass) {
-      return _buildGlassBar(context, store, playMusicInfo, theme, hasPlayer, barHeight);
-    }
+    final barHeight = hasPlayer ? 130.0 : 70.0;
 
     return SafeArea(
       top: false,
@@ -44,77 +35,13 @@ class UnifiedBottomBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 进度条
-            if (hasPlayer) _buildProgress(store, context),
-            // 悬浮底栏
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHigh.withAlpha(150),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: theme.colorScheme.outlineVariant.withAlpha(60),
-                        width: 0.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(25),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withAlpha(10),
-                          blurRadius: 40,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: hasPlayer
-                        ? _buildPlayerBar(store, playMusicInfo, theme, context)
-                        : _buildNavBar(theme),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 液态玻璃风格底栏
-  Widget _buildGlassBar(
-    BuildContext context,
-    PlayerStore store,
-    dynamic playMusicInfo,
-    ThemeData theme,
-    bool hasPlayer,
-    double barHeight,
-  ) {
-    return SafeArea(
-      top: false,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOutCubic,
-        height: barHeight,
-        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 进度条 — 液态玻璃模式用 GlassSlider
             if (hasPlayer) _buildGlassProgress(store, context),
-            // 悬浮底栏 — 液态玻璃模式用 GlassCard 包裹
             Expanded(
               child: isGlass
                   ? GlassCard(
-                      borderRadius: 24,
                       child: hasPlayer
-                          ? _buildGlassPlayerBar(store, playMusicInfo, theme, context)
-                          : _buildNavBar(theme),
+                          ? _buildGlassPlayerBar(store, playMusicInfo, theme, context, isGlass)
+                          : _buildNavBar(theme, isGlass),
                     )
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(24),
@@ -142,8 +69,8 @@ class UnifiedBottomBar extends StatelessWidget {
                             ],
                           ),
                           child: hasPlayer
-                              ? _buildPlayerBar(store, playMusicInfo, theme, context)
-                              : _buildNavBar(theme),
+                              ? _buildPlayerBar(store, playMusicInfo, theme, context, isGlass)
+                              : _buildNavBar(theme, isGlass),
                         ),
                       ),
                     ),
@@ -154,7 +81,6 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 玻璃进度条
   Widget _buildGlassProgress(PlayerStore store, BuildContext context) {
     return GestureDetector(
       onHorizontalDragUpdate: (details) {
@@ -162,7 +88,7 @@ class UnifiedBottomBar extends StatelessWidget {
         final ratio = (details.localPosition.dx / box.size.width).clamp(0.0, 1.0);
         final maxMs = store.progress.maxPlayTime;
         if (maxMs > 0) {
-          globalPlayer.seekTo(Duration(milliseconds: (maxMs * ratio * 1000).round()));
+          globalPlayer.seekTo(Duration(milliseconds: (maxMs * ratio).round()));
         }
       },
       child: Container(
@@ -199,12 +125,12 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 玻璃风格播放器底栏
   Widget _buildGlassPlayerBar(
     PlayerStore store,
     dynamic playMusicInfo,
     ThemeData theme,
     BuildContext context,
+    bool isGlass,
   ) {
     final info = playMusicInfo.musicInfo;
     return Row(
@@ -213,14 +139,12 @@ class UnifiedBottomBar extends StatelessWidget {
         _buildCompactNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
         _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
         const Spacer(),
-        // 上一首
         _GlassButton(
           child: Icon(Icons.skip_previous_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
           onPressed: () => globalPlayer.playPrevious(),
           isGlass: isGlass,
         ),
         const SizedBox(width: 4),
-        // 封面 + 暂停
         GestureDetector(
           onTap: () => globalPlayer.togglePlay(),
           onLongPress: () {
@@ -261,7 +185,6 @@ class UnifiedBottomBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        // 下一首
         _GlassButton(
           child: Icon(Icons.skip_next_rounded, size: 22, color: theme.colorScheme.onSurfaceVariant),
           onPressed: () => globalPlayer.playNext(),
@@ -275,7 +198,6 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 进度条
   Widget _buildProgress(PlayerStore store, BuildContext context) {
     final progress = store.progress.progress.clamp(0.0, 1.0);
     return GestureDetector(
@@ -284,7 +206,7 @@ class UnifiedBottomBar extends StatelessWidget {
         final ratio = (details.localPosition.dx / box.size.width).clamp(0.0, 1.0);
         final maxMs = store.progress.maxPlayTime;
         if (maxMs > 0) {
-          globalPlayer.seekTo(Duration(milliseconds: (maxMs * ratio * 1000).round()));
+          globalPlayer.seekTo(Duration(milliseconds: (maxMs * ratio).round()));
         }
       },
       child: Container(
@@ -321,189 +243,227 @@ class UnifiedBottomBar extends StatelessWidget {
     );
   }
 
-  /// 有歌曲时的底栏 — 导航 | 上一首 | 封面(含暂停) | 下一首 | 导航
-  Widget _buildPlayerBar(PlayerStore store, playMusicInfo, ThemeData theme, BuildContext context) {
+  Widget _buildPlayerBar(
+    PlayerStore store,
+    dynamic playMusicInfo,
+    ThemeData theme,
+    BuildContext context,
+    bool isGlass,
+  ) {
     final info = playMusicInfo.musicInfo;
-
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(width: 6),
-        // 左侧导航
-        _buildCompactNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
-        _buildCompactNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
-        const Spacer(),
-        // 上一首
-        GestureDetector(
-          onTap: () => globalPlayer.playPrevious(),
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Icon(Icons.skip_previous_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // 封面 + 暂停覆盖 — 单击暂停/播放，长按进详情
-        GestureDetector(
-          onTap: () => globalPlayer.togglePlay(),
-          onLongPress: () {
-            Navigator.of(context, rootNavigator: true).push(
-              SlideUpRoute(page: const PlayDetailScreen()),
-            );
-          },
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              _AnimatedCover(
-                url: info.displayImg,
-                isPlaying: store.isPlay,
-                size: 40,
-              ),
-              // 暂停/播放覆盖层
-              AnimatedOpacity(
-                opacity: store.isPlay ? 0.0 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: Colors.black45,
+        _buildProgress(store, context),
+        Row(
+          children: [
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context, rootNavigator: true).push(
+                  SlideUpRoute(page: const PlayDetailScreen()),
+                );
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: CachedNetworkImage(
+                  imageUrl: info.displayImg,
+                  width: 42,
+                  height: 42,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    width: 42,
+                    height: 42,
+                    color: theme.colorScheme.surfaceContainerHighest,
                   ),
-                  child: const Icon(Icons.play_arrow_rounded, size: 26, color: Colors.white),
+                  errorWidget: (_, __, ___) => Container(
+                    width: 42,
+                    height: 42,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Icon(Icons.music_note, color: theme.colorScheme.onSurfaceVariant, size: 20),
+                  ),
                 ),
               ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    info.songName ?? '未知歌曲',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600) ??
+                        const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    info.singer ?? '未知歌手',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ) ?? const TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: IconButton(
+                icon: Icon(store.isPlay ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 20),
+                onPressed: () => globalPlayer.togglePlay(),
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 64, right: 12),
+          child: Row(
+            children: [
+              _buildMiniNav(theme, 0, Icons.home_outlined, Icons.home_rounded),
+              _buildMiniNav(theme, 1, Icons.search_outlined, Icons.search_rounded),
+              const Spacer(),
+              _buildMiniNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
+              _buildMiniNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
             ],
           ),
         ),
-        const SizedBox(width: 8),
-        // 下一首
-        GestureDetector(
-          onTap: () => globalPlayer.playNext(),
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Icon(Icons.skip_next_rounded, size: 24, color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
-        const Spacer(),
-        // 右侧导航
-        _buildCompactNav(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
-        _buildCompactNav(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
-        const SizedBox(width: 6),
       ],
     );
   }
 
-  /// 无歌曲时的底栏 — 纯导航
-  Widget _buildNavBar(ThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildNavIcon(theme, 0, Icons.home_outlined, Icons.home_rounded),
-        _buildNavIcon(theme, 1, Icons.search_outlined, Icons.search_rounded),
-        _buildNavIcon(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded),
-        _buildNavIcon(theme, 3, Icons.settings_outlined, Icons.settings_rounded),
-      ],
-    );
-  }
-
-  /// 标准导航图标（无歌曲时用）
-  Widget _buildNavIcon(ThemeData theme, int index, IconData icon, IconData selectedIcon) {
-    final selected = currentIndex == index;
-    return GestureDetector(
-      onTap: () => onTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: selected
-            ? BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withAlpha(180),
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: Icon(
-            selected ? selectedIcon : icon,
-            key: ValueKey('${index}_$selected'),
-            size: 20,
-            color: selected
-                ? theme.colorScheme.onPrimaryContainer
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
+  Widget _buildNavBar(ThemeData theme, bool isGlass) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(theme, 0, Icons.home_outlined, Icons.home_rounded, isGlass),
+          _buildNavItem(theme, 1, Icons.search_outlined, Icons.search_rounded, isGlass),
+          _buildNavItem(theme, 2, Icons.library_music_outlined, Icons.library_music_rounded, isGlass),
+          _buildNavItem(theme, 3, Icons.settings_outlined, Icons.settings_rounded, isGlass),
+        ],
       ),
     );
   }
 
-  /// 紧凑导航图标（有歌曲时用，小号）
-  Widget _buildCompactNav(ThemeData theme, int index, IconData icon, IconData selectedIcon) {
+  Widget _buildNavItem(ThemeData theme, int index, IconData icon, IconData activeIcon, bool isGlass) {
     final selected = currentIndex == index;
-    return GestureDetector(
-      onTap: () => onTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
+    final color = selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant;
+    return IconButton(
+      isSelected: selected,
+      icon: Icon(icon, size: 22),
+      selectedIcon: Icon(activeIcon, size: 22),
+      onPressed: () => onTap(index),
+      color: color,
+      selectedColor: color,
+      style: IconButton.styleFrom(
+        backgroundColor: isGlass && selected ? theme.colorScheme.primary.withAlpha(30) : null,
+      ),
+    );
+  }
+
+  Widget _buildCompactNav(ThemeData theme, int index, IconData icon, IconData activeIcon) {
+    final selected = currentIndex == index;
+    return IconButton(
+      isSelected: selected,
+      icon: Icon(icon, size: 22),
+      selectedIcon: Icon(activeIcon, size: 22),
+      onPressed: () => onTap(index),
+      color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+      style: IconButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Icon(
-          selected ? selectedIcon : icon,
-          size: 18,
-          color: selected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.onSurfaceVariant.withAlpha(150),
-        ),
       ),
+    );
+  }
+
+  Widget _buildMiniNav(ThemeData theme, int index, IconData icon, IconData activeIcon) {
+    final selected = currentIndex == index;
+    return IconButton(
+      isSelected: selected,
+      icon: Icon(icon, size: 20),
+      selectedIcon: Icon(activeIcon, size: 20),
+      onPressed: () => onTap(index),
+      color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+      style: IconButton.styleFrom(padding: const EdgeInsets.all(6)),
     );
   }
 }
 
-/// 带动画的封面组件 — 切歌时播放缩放+淡入动画
+class _GlassButton extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onPressed;
+  final bool isGlass;
+
+  const _GlassButton({required this.child, required this.onPressed, required this.isGlass});
+
+  @override
+  Widget build(BuildContext context) {
+    if (isGlass) {
+      return InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: child,
+        ),
+      );
+    }
+    return IconButton(onPressed: onPressed, icon: child, padding: const EdgeInsets.all(8));
+  }
+}
+
+class _GlassCoverCard extends StatelessWidget {
+  final Widget child;
+  const _GlassCoverCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
+          width: 1,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _AnimatedCover extends StatefulWidget {
-  final String? url;
+  final String url;
   final bool isPlaying;
   final double size;
-
-  const _AnimatedCover({
-    required this.url,
-    required this.isPlaying,
-    required this.size,
-  });
+  const _AnimatedCover({required this.url, required this.isPlaying, required this.size});
 
   @override
   State<_AnimatedCover> createState() => _AnimatedCoverState();
 }
 
 class _AnimatedCoverState extends State<_AnimatedCover> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnim;
-  late Animation<double> _fadeAnim;
-  String? _currentUrl;
+  late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _currentUrl = widget.url;
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-    _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
-    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-    _controller.forward();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 8))
+      ..repeat();
   }
 
   @override
-  void didUpdateWidget(_AnimatedCover oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.url != _currentUrl) {
-      _currentUrl = widget.url;
-      _controller.reset();
-      _controller.forward();
+  void didUpdateWidget(_AnimatedCover old) {
+    super.didUpdateWidget(old);
+    if (widget.isPlaying) {
+      _controller.repeat();
+    } else {
+      _controller.stop();
     }
   }
 
@@ -515,98 +475,27 @@ class _AnimatedCoverState extends State<_AnimatedCover> with SingleTickerProvide
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnim.value,
-          child: Opacity(
-            opacity: _fadeAnim.value,
-            child: child,
-          ),
-        );
-      },
-      child: Container(
-        width: widget.size,
-        height: widget.size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(widget.size * 0.25),
-          color: Colors.grey.shade300,
-        ),
-        child: widget.url != null && widget.url!.isNotEmpty
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(widget.size * 0.25),
-                child: CachedNetworkImage(
-                  imageUrl: widget.url!,
-                  width: widget.size,
-                  height: widget.size,
-                  fit: BoxFit.cover,
-                  memCacheWidth: (widget.size * 2).round(),
-                  errorWidget: (_, __, ___) =>
-                      Icon(Icons.music_note, size: widget.size * 0.5),
-                ),
-              )
-            : Icon(Icons.music_note, size: widget.size * 0.5),
-      ),
-    );
-  }
-}
-
-/// 通用玻璃按钮 (在玻璃和非玻璃模式之间切换)
-class _GlassButton extends StatelessWidget {
-  final Widget child;
-  final VoidCallback onPressed;
-  final bool isGlass;
-
-  const _GlassButton({
-    required this.child,
-    required this.onPressed,
-    required this.isGlass,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (isGlass) {
-      return InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(6),
-          child: child,
-        ),
-      );
-    }
-    return GestureDetector(
-      onTap: onPressed,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        child: child,
-      ),
-    );
-  }
-}
-
-/// 封面玻璃卡片
-class _GlassCoverCard extends StatelessWidget {
-  final Widget child;
-  const _GlassCoverCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant.withAlpha(40),
-          width: 0.5,
-        ),
-      ),
+    return RotationTransition(
+      turns: _controller,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(11.5),
-        child: child,
+        borderRadius: BorderRadius.circular(widget.size * 0.25),
+        child: CachedNetworkImage(
+          imageUrl: widget.url,
+          width: widget.size,
+          height: widget.size,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(
+            width: widget.size,
+            height: widget.size,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          ),
+          errorWidget: (_, __, ___) => Container(
+            width: widget.size,
+            height: widget.size,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Icon(Icons.music_note, color: Theme.of(context).colorScheme.onSurfaceVariant, size: widget.size * 0.5),
+          ),
+        ),
       ),
     );
   }

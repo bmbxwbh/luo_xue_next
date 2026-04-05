@@ -44,7 +44,6 @@ class SettingsScreen extends StatelessWidget {
         subtitle: subtitle,
         trailing: trailing ?? const Icon(Icons.chevron_right),
         onTap: onTap,
-        dense: dense,
       );
     }
     return ListTile(
@@ -150,11 +149,10 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           // 液态玻璃模式下，用玻璃面板覆盖整个设置页背景
-          if (glass) 
+          if (glass)
             Positioned.fill(
               child: IgnorePointer(
                 child: GlassCard(
-                  borderRadius: 0,
                   padding: EdgeInsets.zero,
                 ),
               ),
@@ -554,32 +552,35 @@ class SettingsScreen extends StatelessWidget {
         );
 
         return glass
-            ? GlassDialog(
-                title: const Text('导入 MF 插件'),
-                content: content,
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('取消'),
-                  ),
-                  FilledButton(
-                    onPressed: () async {
-                      final script = controller.text.trim();
-                      if (script.isEmpty) return;
-                      final mfManager = context.read<MusicFreeManager>();
-                      final result = await mfManager.importPlugin(script);
-                      if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(result['success'] == true
-                              ? '✅ ${result['message']}'
-                              : '❌ ${result['message']}')),
-                        );
-                      }
-                    },
-                    child: const Text('导入'),
-                  ),
-                ],
+            ? showDialog(
+                context: ctx,
+                builder: (_) => AlertDialog(
+                  title: const Text('导入 MF 插件'),
+                  content: content,
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('取消'),
+                    ),
+                    FilledButton(
+                      onPressed: () async {
+                        final script = controller.text.trim();
+                        if (script.isEmpty) return;
+                        final mfManager = context.read<MusicFreeManager>();
+                        final result = await mfManager.importPlugin(script);
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(result['success'] == true
+                                ? '✅ ${result['message']}'
+                                : '❌ ${result['message']}')),
+                          );
+                        }
+                      },
+                      child: const Text('导入'),
+                    ),
+                  ],
+                ),
               )
             : AlertDialog(
                 title: const Text('导入 MF 插件'),
